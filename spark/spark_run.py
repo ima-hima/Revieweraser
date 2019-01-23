@@ -13,28 +13,27 @@ def main(input_filename = '../test/test_input.tsv'):
     # users is a dictionary of lists: user_id : [total reviews, number of stars in this review, length of this review, allow?]
     users = dict()
     with open(input_filename) as input_stream:
-        reader = DictReader(input_filename, delimiter='\t')
+        reader = DictReader(input_stream, delimiter='\t')
         for row in reader:
-            for index in row:
-                print( index )
-    #         print row['customer_id']
-    #         try:
-    #             users[row['customer_id']][0] += 1 # It'll fail early, so next work will only run once, here or
-    #                                               # in except.
-    #             users[row['customer_id']][1] += int(row['star_rating'])
-    #             users[row['customer_id']][2] += row['review_body'].count(' ') # number of words - 1
-    #         except:
-    #             users[row['customer_id']] = [1, int(row['star_rating']), row['review_body'].count(' '), True]
+            print( 'customer id:', row['customer_id'] )
+            try:
+                users[row['customer_id']][0] += 1 # It'll fail early, so next work will only run once, here or
+                                                  # in except.
+                users[row['customer_id']][1] += int(row['star_rating'])
+                users[row['customer_id']][2] += row['review_body'].count(' ') # number of words - 1
+            except:
+                users[row['customer_id']] = [1, int(row['star_rating']), row['review_body'].count(' '), True]
 
-    # multiple = 0 # Will tell me how many will be eliminated.
-    #              # See criteria in module comment.
-    # for user in users:
-    #     average_rating = users[user][1] / users[user][0] # trying to save heap accesses
-    #     if users[user][0] > 1 and (average_rating == 5 or average_rating == 1) and users[user][2] / users[user][0] < 6:
-    #         users[user][3] = False
-    #         multiple += 1
+    multiple = 0 # Will tell me how many will be eliminated.
+                 # See criteria in module comment.
+    for user in users:
+        average_rating = users[user][1] / users[user][0] # trying to save heap accesses
+        if users[user][0] > 1 and (average_rating == 5 or average_rating == 1) and users[user][2] / users[user][0] < 6:
+            users[user][3] = False
+            multiple += 1
 
-    # print( len(users), multiple )
+    print( 'total users:', len(users) )
+    print( 'total eliminations:', multiple )
 
 def cassandra_output():
 
