@@ -6,26 +6,26 @@
 
 from csv         import DictReader
 from pyspark     import SparkConf, SparkContext
+import pyspark_cassandra
 # from pyspark.sql import SQLContext
 
 
 def main(input_filename = '../test/test_input.tsv'):
     spark_conf = SparkConf().setAppName("Batch processing") #("spark.cores.max", "1")
-    sc = SparkContext(conf=spark_conf)
+    sc = pyspark_cassandra.CassandraSparkContext(conf=spark_conf)
+    sc.setLogLevel("ERROR")
+    sc.cassandraTable('keyspace', 'table')
 
     dataFile = sc.textFile(input_filename)
     header = dataFile.first()
 
-    keyed_data = dataFile.filter(lambda line: line != header).map(map_fn)
+    keyed_data       = dataFile.filter(lambda line: line != header).map(map_fn)
     keyed_for_counts = dataFile.filter(lambda line: line != header).map(map_counts_fn)
-    counts     = keyed_for_counts.reduceByKey(count_keys)
-    averages   = keyed_data.reduceByKey(average_reviews)
-    # counts     = keyed_data.countByKey()
-    # final = averages.map(lambda )
-    # print(averages.take(10))
-    # print(counts.take(10))
-    final      = counts.join(averages) # .map(concat_fn)
-    final.take(10).saveAsTextFile("spark_output")
+    counts           = keyed_for_counts.reduceByKey(count_keys)
+    averages         = keyed_data.reduceByKey(average_reviews)
+    final            = counts.join(averages).map(concat_fn)
+    final.saveAsTextFile("spark_output")
+    final.cassandraTable('amazon', 'users')
 
     # print(final.take(10))
     # sqlContext = SQLContext(sc)
@@ -69,7 +69,7 @@ def map_counts_fn(line):
     return (line[1], 1)
 
 def concat_fn(line):
-    return [line[0], line[1][0], line[1][1]]
+    return (line[0], line[1][0], line[1][1][0], line[1][1][1])
 
 
 def average_reviews(accum, input_list):
