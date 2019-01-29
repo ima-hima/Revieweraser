@@ -6,18 +6,23 @@
 
 from csv        import DictReader
 from pyspark    import SparkConf, SparkContext
-from subprocess import call
-from time       import clock
+from subprocess import call, check_output
+from time       import time
 # from pyspark.sql import SQLContext
 
 
-def main(input_filename = 'amazon_reviews_us_Digital_Ebook_Purchase_v1_00.tsv.gz'):
-    start_time = clock()
+def main(input_filename = 'amazon_reviews_us_Books_v1_00.tsv.gz'):
+    start_time = time()
     spark_conf = SparkConf().setAppName("Batch processing") #("spark.cores.max", "1")
     sc         = SparkContext(conf=spark_conf)
 
-    call(['aws', 's3', 'rm', 's3://eric-ford-insight-19/spark_output', '--recursive'])
-    # call(['aws', 's3', 'rm', 's3://eric-ford-insight-19/spark_output_\$folder\$'])
+    # for loop is in case I decide to have multiple outputs later
+    for output_file in ['spark_output']:
+        if check_output(['aws', 's3', 'ls', 's3://eric-ford-insight-19/']).find(output_file)  >= 0:
+            call(['aws', 's3', 'rm', 's3://eric-ford-insight-19/spark_output', '--recursive'])
+        # This because aws cli fails in an ugly way if a specified file is missing. So I check for it.
+        if check_output(['aws', 's3', 'ls', 's3://eric-ford-insight-19/']).find(output_file + '_$folder$') >= 0:
+            call(['aws', 's3', 'rm', 's3://eric-ford-insight-19/spark_output_$folder$'])
 
     dataFile = sc.textFile('s3n://eric-ford-insight-19/original/' + input_filename) # Don't forget it's s3n, not s3.
     header   = dataFile.first()
@@ -34,7 +39,8 @@ def main(input_filename = 'amazon_reviews_us_Digital_Ebook_Purchase_v1_00.tsv.gz
     final.saveAsTextFile('s3n://eric-ford-insight-19/spark_output')
 
     print final.take(10)
-    print clock() - start_time
+    call(['aws', 's3', 'ls', 's3://eric-ford-insight-19/'])
+    print time() - start_time
     # sqlContext = SQLContext(sc)
 
     # df = sqlContext.read.csv(input_filename, header='true', mode="DROPMALFORMED")
