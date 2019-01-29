@@ -16,13 +16,7 @@ def main(input_filename = 'amazon_reviews_us_Books_v1_00.tsv.gz'):
     spark_conf = SparkConf().setAppName("Batch processing") #("spark.cores.max", "1")
     sc         = SparkContext(conf=spark_conf)
 
-    # for loop is in case I decide to have multiple outputs later
-    for output_file in ['spark_output']:
-        if check_output(['aws', 's3', 'ls', 's3://eric-ford-insight-19/']).find(output_file)  >= 0:
-            call(['aws', 's3', 'rm', 's3://eric-ford-insight-19/spark_output', '--recursive'])
-        # This because aws cli fails in an ugly way if a specified file is missing. So I check for it.
-        if check_output(['aws', 's3', 'ls', 's3://eric-ford-insight-19/']).find(output_file + '_$folder$') >= 0:
-            call(['aws', 's3', 'rm', 's3://eric-ford-insight-19/spark_output_$folder$'])
+    clear_s3_directories(['spark_output'])
 
     dataFile = sc.textFile('s3n://eric-ford-insight-19/original/' + input_filename) # Don't forget it's s3n, not s3.
     header   = dataFile.first()
@@ -71,6 +65,18 @@ def main(input_filename = 'amazon_reviews_us_Books_v1_00.tsv.gz'):
 
     # print( 'total users:', len(users) )
     # print( 'total eliminations:', multiple )
+
+def clear_s3_directories(input_list):
+    ''' Steps through S3 bucket and removes any directoris and directory pointers, because script will hang
+        if it attempts to write into directory that already exists. '''
+    # for loop is in case I decide to have multiple outputs later
+    for output_file in input_list:
+        if check_output(['aws', 's3', 'ls', 's3://eric-ford-insight-19/']).find(output_file)  >= 0:
+            call(['aws', 's3', 'rm', 's3://eric-ford-insight-19/spark_output', '--recursive'])
+        # This because aws cli fails in an ugly way if a specified file is missing. So I check for it.
+        if check_output(['aws', 's3', 'ls', 's3://eric-ford-insight-19/']).find(output_file + '_$folder$') >= 0:
+            call(['aws', 's3', 'rm', 's3://eric-ford-insight-19/spark_output_$folder$'])
+
 
 def create_map_keys_fn(line):
     ''' Return a tuple with key : val = user_id : [star rating, number of words]. '''
