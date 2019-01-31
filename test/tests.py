@@ -11,12 +11,15 @@ from time       import time
 # from pyspark.sql import SQLContext
 
 
-def only_read_gz(input_filename = 'amazon_reviews_us_Books_v1_00.tsv.gz'):
+def only_read_gz(input_filename = 'amazon_reviews_us_Digital_Music_Purchase_v1_00.tsv.gz'):
     start_time = time()
     spark_conf = SparkConf().setAppName("Batch processing") #("spark.cores.max", "1")
     sc         = SparkContext(conf=spark_conf)
 
-    keyed_data       = dataFile.filter(lambda line: line != header).map(create_map_keys_fn)
+    dataFile = sc.textFile('s3n://eric-ford-insight-19/original/' + input_filename) # Don't forget it's s3n, not s3.
+    header   = dataFile.first()
+
+    keyed_data       = dataFile.filter(lambda line: line != header).map(lambda x: (x, 1))
     # count appearances of each key in `keyed_data`
 
     print time() - start_time

@@ -6,35 +6,44 @@
 
 from csv        import DictReader
 from pyspark    import SparkConf, SparkContext
+import redis
 from subprocess import call, check_output
 from time       import time
 # from pyspark.sql import SQLContext
 
 
-def main(input_filename = 'amazon_reviews_us_Books_v1_00.tsv.gz'):
+def main(input_filename = 'amazon_reviews_us_Gift_Card_v1_00.tsv.gz'):
     start_time = time()
     spark_conf = SparkConf().setAppName("Batch processing") #("spark.cores.max", "1")
     sc         = SparkContext(conf=spark_conf)
 
     clear_s3_directories(['spark_output'])
 
+    # dataFile = spark.read.csv('s3n://eric-ford-insight-19/original/' + input_filename, header=True).rdd
+
     dataFile = sc.textFile('s3n://eric-ford-insight-19/original/' + input_filename) # Don't forget it's s3n, not s3.
     header   = dataFile.first()
 
     # create initial key:val
+    # keyed_data       = dataFile.map(create_map_keys_fn)
     keyed_data       = dataFile.filter(lambda line: line != header).map(create_map_keys_fn)
     # count appearances of each key in `keyed_data`
+    # keyed_for_counts = dataFile.map(map_counts_fn)
     keyed_for_counts = dataFile.filter(lambda line: line != header).map(map_counts_fn)
     # get count of each user's reviews
     counts           = keyed_for_counts.reduceByKey(count_keys)
     #
     averages         = keyed_data.reduceByKey(average_reviews)
     final            = counts.join(averages).map(concat_fn)
-    final.saveAsTextFile('s3n://eric-ford-insight-19/spark_output')
+    print(type(final))
+    # for key in final:
+    #     redis_insert(redis_db, key)
+    final.foreachPartition( redis_insert )
+    # final.saveAsTextFile('s3n://eric-ford-insight-19/spark_output')
 
-    print final.take(10)
-    call(['aws', 's3', 'ls', 's3://eric-ford-insight-19/'])
-    print time() - start_time
+    print( final.take(10) )
+    # call(['aws', 's3', 'ls', 's3://eric-ford-insight-19/'])
+    print( time() - start_time )
     # sqlContext = SQLContext(sc)
 
     # df = sqlContext.read.csv(input_filename, header='true', mode="DROPMALFORMED")
@@ -70,12 +79,29 @@ def clear_s3_directories(input_list):
     ''' Steps through S3 bucket and removes any directoris and directory pointers, because script will hang
         if it attempts to write into directory that already exists. '''
     # for loop is in case I decide to have multiple outputs later
+    def file_exists(filename):
+        return check_output(['aws', 's3', 'ls', 's3://eric-ford-insight-19/'], universal_newlines=True).find(output_file + filename) >= 0
     for output_file in input_list:
-        if check_output(['aws', 's3', 'ls', 's3://eric-ford-insight-19/']).find(output_file)  >= 0:
+        if file_exists(''):
             call(['aws', 's3', 'rm', 's3://eric-ford-insight-19/spark_output', '--recursive'])
         # This because aws cli fails in an ugly way if a specified file is missing. So I check for it.
-        if check_output(['aws', 's3', 'ls', 's3://eric-ford-insight-19/']).find(output_file + '_$folder$') >= 0:
+        if file_exists('_$folder$'):
             call(['aws', 's3', 'rm', 's3://eric-ford-insight-19/spark_output_$folder$'])
+
+
+def redis_insert(iter):
+    ''' Insert tuple (rdd) into Redis. Tuple is of form (key, [int, int, int]), where the ints are
+        number of reviews, total star rating, total number of words, respectively. '''
+    import redis
+    from sys import exit
+    redis_db = redis.Redis(host="10.0.0.13", port=6379, db=1)
+
+    # print(tup)
+    # print(tup[0], 'num', tup[1][0], 'stars', tup[1][1], 'words', tup[1][2] )
+    for tup in iter:
+        # print(tup)
+        # exit(1)
+        redis_db.hmset(tup[0], {'num': tup[1], 'stars': tup[2], 'words': tup[3]} )
 
 
 def create_map_keys_fn(line):
