@@ -1,0 +1,7 @@
+#! /bin/bash
+
+cd test
+rm -rf spark_output
+spark-submit --master spark://10.0.0.4:7077 tests.py
+
+# spark-submit spark_run.py
