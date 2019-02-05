@@ -2,15 +2,38 @@
 <html>
   <head>
     <style>
+      body {
+        min-width: 100px;
+      }
       button {
         height: 30px;
         width: 30px;
         outline: none;
       }
+      .bulletless {
+        list-style-type: none;
+        margin-left: 0;
+        padding-left: 0;
+      }
+
     </style>
   </head>
   <body>
+    <div>
+      <ul class="bulletless">
+        <li><input type="checkbox" name="short">Short reviews.</li>
+        <li><input type="checkbox" name="few">Too few reviews.</li>
+        <li><input type="checkbox" name="average">By average review.</li>
+      </ul>
+
+    </div>
     <button id="changeColor"></button>
+    <div class="slidecontainer">
+      Average minimum review: <span id="minVal"></span>
+      <input type="range" min="1" max="5" value="3" step=".1" class="slider" id="min">
+      Average maximum review: <span id="maxVal"></span>
+      <input type="range" min="1" max="5" value="3" step=".1" class="slider" id="max">
+    </div>
   </body>
   <script src="popup.js"></script>
 </html>

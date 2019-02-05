@@ -1,11 +1,12 @@
+// This will hold a description as well as
 {
-    "name": "Getting Started Example",
+    "name": "Clean Up Amazon Reviews",
     "version": "1.0",
-    "description": "Build an Extension!",
+    "description": "Remove reviews deemed worthless.",
     "options_page": "options.html",
     "permissions": ["activeTab", "declarativeContent", "storage"],
     "background": {
-      "scripts": ["background.js"],
+      "scripts": ["jquery-3.3.1.min.js", "background.js"],
       "persistent": false
     },
     "page_action": {
