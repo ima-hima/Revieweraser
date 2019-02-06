@@ -1,14 +1,24 @@
-// This will hold a description as well as
 {
-    "name": "Clean Up Amazon Reviews",
+    "name": "Amazon Reviews",
     "version": "1.0",
-    "description": "Remove reviews deemed worthless.",
+    "description": "This allows the user to remove Amazon reviews deemed worthless by some user-defined criteria.",
     "options_page": "options.html",
     "permissions": ["activeTab", "declarativeContent", "storage"],
     "background": {
-      "scripts": ["jquery-3.3.1.min.js", "background.js"],
+      "scripts": ["popup.js"],
       "persistent": false
     },
+    "background": [{
+      "scripts": ["jquery-3.3.1.min.js", "background.js"],
+      "persistent": false,
+      "run_at": "document_end"
+    }],
+    "content_scripts": [{
+      "js": ["jquery-3.3.1.min.js"],
+      "matches": ["https://www.amazon.com/*"],
+      "persistent": false,
+      "run_at": "document_end"
+    }],
     "page_action": {
       "default_popup": "popup.html",
       "default_icon": {

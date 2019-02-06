@@ -4,42 +4,57 @@
 
 'use strict';
 
+// First, functionality to hide sliders
+// document.getElementById("averageReview").addEventListener("input", hideSliders); // This kludge because I couldn't get oninput to work.
+var slideContainer = document.getElementById("slidecontainer");
+var minSlider = document.getElementById("minSlider");
+var minOutput = document.getElementById("curMinVal");
+let maxSlider = document.getElementById("maxSlider");
+let maxOutput = document.getElementById("curMaxVal");
 
-let changeColor = document.getElementById('changeColor');
-chrome.storage.sync.get('color', function(data) {
-  changeColor.style.backgroundColor = data.color;
-  changeColor.setAttribute('value', data.color);
-});
-changeColor.onclick = function(element) {
-  let color = element.target.value;
-  chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-    chrome.tabs.executeScript(
-        tabs[0].id,
-        {code: 'document.body.style.backgroundColor = "' + color + '";'});
-  });
-};
-var minSlider = document.getElementById("min");
-var minOutput = document.getElementById("minVal");
-minVal.innerHTML = minSlider.value; // Display the default slider value
 
-// Update the current slider value (each time you drag the slider handle)
+
+function hideSliders() {
+  // Hide the sliders whenever the "based on average review" is unchecked
+  if (this.checked) {
+    slideContainer.style.display = "block";
+  } else {
+    slideContainer.style.display = "none";
+  }
+}
+
+// Now updated the slider values
+// First with min value
+
+minOutput.innerHTML = minSlider.value; // Display the default slider value
+
 minSlider.oninput = function() {
-  minVal.innerHTML = this.value;
+  // Show min value in display
+  minOutput.innerHTML = this.value;
+  // chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+  //   chrome.tabs.sendMessage(tabs[0].id, {greeting: "hello"}, function(response) {
+  //     console.log(response.farewell);
+  //   });
+  // });
 }
 
-var maxSlider = document.getElementById("max");
-var maxOutput = document.getElementById("maxVal");
-maxVal.innerHTML = maxSlider.value; // Display the default slider value
+// Same thing, now with max value
+maxOutput.innerHTML = maxSlider.value;
 
-// Update the current slider value (each time you drag the slider handle)
 maxSlider.oninput = function() {
-  maxVal.innerHTML = this.value;
+  maxOutput.innerHTML = this.value;
+  // chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+  //   chrome.tabs.sendMessage(tabs[0].id, {greeting: "hello"}, function(response) {
+  //     console.log(response.farewell);
+  //   });
+  // });
 }
 
-var reviewers = document.getElementsByClassName("a-profile");
 
-for (var i = 0, max = reviewers.length; i < max; i++) {
-     if (reviewers[i].href.includes("AGLHTJEJHQQ763RAURZ2SRP2VKBA")) {
-       reviewers[i].style.backgroundColor = "blue"
-     }
-}
+
+//   chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+//   chrome.tabs.sendMessage(tabs[0].id, {greeting: "hello"}, function(response) {
+//     console.log(response.farewell);
+//   });
+// });
+
