@@ -4,57 +4,81 @@
 
 'use strict';
 
-// First, functionality to hide sliders
-// document.getElementById("averageReview").addEventListener("input", hideSliders); // This kludge because I couldn't get oninput to work.
-var slideContainer = document.getElementById("slidecontainer");
-var minSlider = document.getElementById("minSlider");
-var minOutput = document.getElementById("curMinVal");
-let maxSlider = document.getElementById("maxSlider");
-let maxOutput = document.getElementById("curMaxVal");
+$(document).ready(function() {
+  // First, functionality to hide sliders
+  // document.getElementById("averageReview").addEventListener("input", hideSliders); // This kludge because I couldn't get oninput to work.
+  // var slideContainer = document.getElementById("slidecontainer");
+  var minSlider       = $("#minSlider");
+  var minOutput       = $("#curMinVal");
+  var maxSlider       = $("#maxSlider");
+  var maxOutput       = $("#curMaxVal");
+  var wordSlider      = $("#wordSlider");
+  var wordCount       = $("#wordCount");
+  var lowReviewCheck  = $("#lowReviewCheck");
+  var highReviewcheck = $("#highReviewcheck");
+  var wordCountCheck  = $("#wordCountCheck");
+
+  minOutput.innerHTML = minSlider.value; // Display the default slider value
+  maxOutput.innerHTML = maxSlider.value;
+  wordCount.innerHTML = wordSlider.value;
+
+  // $('.slider').slider({ disabled: true });
+
+  // wordCountCheck.oninput = function() {
+  //     wordSlider.toggle();
+  // }
+
+  // Now updated the slider values
+  // First with min value
+  $("#minSlider").on('input', function() {
+    // Show min value in display
+    $("#curMinVal").html($(this).val());
+    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+      alert("it fired");
+      chrome.tabs.sendMessage(tabs[0].id, {greeting: "hello"}, function(response) {
+        console.log(response.farewell);
+      });
+    });
+  });
+
+  // Same thing, now with max value
+  $("#maxSlider").on('input', function() {
+    // Show min value in display
+    $("#curMaxVal").html($(this).val());
+    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+      chrome.tabs.sendMessage(tabs[0].id, {greeting: "hello"}, function(response) {
+        console.log(response.farewell);
+      });
+    });
+  });
 
 
-
-function hideSliders() {
-  // Hide the sliders whenever the "based on average review" is unchecked
-  if (this.checked) {
-    slideContainer.style.display = "block";
-  } else {
-    slideContainer.style.display = "none";
+  // Finally word slider
+  // Same thing, now with max value
+  wordSlider.oninput = function() {
+    wordCount.innerHTML = this.value;
+    // chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+    //   chrome.tabs.sendMessage(tabs[0].id, {greeting: "hello"}, function(response) {
+    //     console.log(response.farewell);
+    //   });
+    // });
   }
-}
+  $("#wordSlider").on('input', function() {
+    // Show min value in display
+    $("#wordCount").html($(this).val());
+    // chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+    //   chrome.tabs.sendMessage(tabs[0].id, {greeting: "hello"}, function(response) {
+    //     console.log(response.farewell);
+    //   });
+    // });
+  });
 
-// Now updated the slider values
-// First with min value
 
-minOutput.innerHTML = minSlider.value; // Display the default slider value
-
-minSlider.oninput = function() {
-  // Show min value in display
-  minOutput.innerHTML = this.value;
-  // chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+  //   chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
   //   chrome.tabs.sendMessage(tabs[0].id, {greeting: "hello"}, function(response) {
   //     console.log(response.farewell);
   //   });
   // });
-}
 
-// Same thing, now with max value
-maxOutput.innerHTML = maxSlider.value;
-
-maxSlider.oninput = function() {
-  maxOutput.innerHTML = this.value;
-  // chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-  //   chrome.tabs.sendMessage(tabs[0].id, {greeting: "hello"}, function(response) {
-  //     console.log(response.farewell);
-  //   });
-  // });
-}
-
-
-
-//   chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-//   chrome.tabs.sendMessage(tabs[0].id, {greeting: "hello"}, function(response) {
-//     console.log(response.farewell);
-//   });
-// });
+});
 

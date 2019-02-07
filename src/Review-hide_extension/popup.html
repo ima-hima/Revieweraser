@@ -3,7 +3,7 @@
   <head>
     <style>
       body {
-        min-width: 100px;
+        min-width: 200px;
       }
       button {
         height: 30px;
@@ -15,26 +15,46 @@
         margin-left: 0;
         padding-left: 0;
       }
-      #slidecontianer {
-        display: none;
+      label {
+          display: block;
+          padding-left: 2em;
+          text-indent: -1.5em;
       }
-
+      li {
+        margin-bottom: 10px;
+        padding-bottom: 10px;
+      }
+      .slider {
+        width: 91%;
+        margin: 0 9px;
+      }
+      /* #slidecontianer {
+        display: none;
+      } */
     </style>
+    <script src="jquery-3.3.1.min.js"></script>
   </head>
   <body>
     <div>
       <ul class="bulletless">
-        <li><input type="checkbox" id="short" />Reviews are too short.</li>
-        <li><input type="checkbox" id="averageReview" />Hide based on average review.</li>
+        <li style="border-bottom: solid #9E9E9E 1px;"><label>
+            <input type="checkbox" id="wordCountCheck" />Hide if reviewer&lsquo;s reviews are shorter than <span id="wordCount">3</span>.
+          </label>
+            <input type="range" min="1" max="5" value="3" step=".1" class="slider" style="padding-bottom: 0;" id="wordSlider" /></li></li>
+        <li style="border-bottom: solid #9E9E9E 1px;"><label>
+            <input type="checkbox" id="lowReviewCheck" />Hide if reviewer&lsquo;s average star ratings are less than
+            <span id="curMinVal">3</span> stars.
+          </label>
+            <input type="range" min="1" max="5" value="3" step=".1" class="slider" id="minSlider" /></li>
+        <li><label>
+            <input type="checkbox" id="highReviewCheck" />Hide if reviewer&lsquo;s average star ratings are more than
+            <span id="curMaxVal">3</span> stars.
+          </label>
+            <input type="range" min="1" max="5" value="3" step=".1" class="slider" style="padding-bottom: 0;" id="maxSlider" /></li>
       </ul>
 
     </div>
-    <div id="slidecontainer">
-      Average review are less than: <span id="curMinVal"></span> stars
-      <input type="range" min="1" max="5" value="3" step=".1" class="slider" id="minSlider" />
-      Average review are more than: <span id="curMaxVal"></span> stars
-      <input type="range" min="1" max="5" value="3" step=".1" class="slider" id="maxSlider" />
-    </div>
+
   </body>
   <script src="popup.js"></script>
 </html>

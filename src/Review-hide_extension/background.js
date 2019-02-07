@@ -5,10 +5,10 @@
 'use strict';
 
 $(document).ready(function() {
-  $( ".a-profile" ).each(function( index ) {
-    console.log( index + ": " + $( this ).text() );
+  $( ".a-profile" ).each(function( idx ) {
+    console.log( idx + ": " + this.text() );
   });
-});
+
 
 // chrome.runtime.onInstalled.addListener(function() {
 //   chrome.storage.sync.set({color: '#3aa757'}, function() {
@@ -36,10 +36,11 @@ $(document).ready(function() {
 //   }
 // );
 
-// var reviewers = document.getElementsByClassName("a-profile");
+    var reviewers = document.getElementsByClassName("a-profile");
 
-// for (var i = 0, max = reviewers.length; i < max; i++) {
-//      if (reviewers[i.href.includes("AGLHTJEJHQQ763RAURZ2SRP2VKBA")) {
-//        i.style.backgroundColor = "blue"
-//      }
-// }
+    for (var i = 0, max = reviewers.length; i < max; i++) {
+         if (reviewers[i.href.includes("AGLHTJEJHQQ763RAURZ2SRP2VKBA")) {
+           i.style.backgroundColor = "blue"
+         }
+    }
+});

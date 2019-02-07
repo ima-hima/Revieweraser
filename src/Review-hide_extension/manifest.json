@@ -5,7 +5,7 @@
     "options_page": "options.html",
     "permissions": ["activeTab", "declarativeContent", "storage"],
     "background": {
-      "scripts": ["popup.js"],
+      "scripts": ["jquery-3.3.1.min.js", "popup.js"],
       "persistent": false
     },
     "background": [{
@@ -14,7 +14,7 @@
       "run_at": "document_end"
     }],
     "content_scripts": [{
-      "js": ["jquery-3.3.1.min.js"],
+      "js": ["jquery-3.3.1.min.js", "content.js"],
       "matches": ["https://www.amazon.com/*"],
       "persistent": false,
       "run_at": "document_end"
