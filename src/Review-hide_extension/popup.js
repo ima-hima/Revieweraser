@@ -28,49 +28,36 @@ $(document).ready(function() {
   //     wordSlider.toggle();
   // }
 
+  function sendToContent(which, val) {
+    // Send to content.js. Note that which is a jQuery selector.
+    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+      chrome.tabs.sendMessage(tabs[0].id, {selector: which, val: val}, function(response) {
+        console.log(response.farewell);
+      });
+    });
+  }
+
   // Now updated the slider values
   // First with min value
   $("#minSlider").on('input', function() {
     // Show min value in display
     $("#curMinVal").html($(this).val());
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-      alert("it fired");
-      chrome.tabs.sendMessage(tabs[0].id, {greeting: "hello"}, function(response) {
-        console.log(response.farewell);
-      });
-    });
+    sendToContent('#curMinVal', $(this).val())
   });
 
   // Same thing, now with max value
   $("#maxSlider").on('input', function() {
     // Show min value in display
     $("#curMaxVal").html($(this).val());
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-      chrome.tabs.sendMessage(tabs[0].id, {greeting: "hello"}, function(response) {
-        console.log(response.farewell);
-      });
-    });
+    sendToContent('#curMaxVal', $(this).val())
   });
 
 
   // Finally word slider
-  // Same thing, now with max value
-  wordSlider.oninput = function() {
-    wordCount.innerHTML = this.value;
-    // chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-    //   chrome.tabs.sendMessage(tabs[0].id, {greeting: "hello"}, function(response) {
-    //     console.log(response.farewell);
-    //   });
-    // });
-  }
   $("#wordSlider").on('input', function() {
     // Show min value in display
     $("#wordCount").html($(this).val());
-    // chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-    //   chrome.tabs.sendMessage(tabs[0].id, {greeting: "hello"}, function(response) {
-    //     console.log(response.farewell);
-    //   });
-    // });
+    sendToContent('#wordCount', $(this).val())
   });
 
 

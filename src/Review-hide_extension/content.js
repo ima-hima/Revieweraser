@@ -20,19 +20,21 @@
 
 $(document).ready(function() {
 
+  var which;
+  var val;
+
   chrome.runtime.onMessage.addListener(
     function(request, sender, sendResponse) {
       console.log(sender.tab ?
                   "from a content script:" + sender.tab.url :
                   "from the extension");
-      if (request.greeting == "hello") {
-        sendResponse({farewell: "goodbye"});
-      } else {
-          sendResponse({farewell: "nope"});
-      }
+      alert(request.selector + ' ' + request.val);
+      which = request.selector;
+      val = request.val;
+      sendResponse({farewell: "nope"});
+      return true;
     }
   );
-
 
   var reviewers = new Array(); // This will be turned into JSON and sent to the redis interface.
   $( "a.a-profile" ).each(function( idx ) {
