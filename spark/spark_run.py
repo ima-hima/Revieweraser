@@ -81,12 +81,16 @@ def redis_insert(iter):
     from sys import exit
     redis_db = redis.Redis(host="10.0.0.13", port=6379, db=1)
 
-    # print(tup)
     # print(tup[0], 'num', tup[1][0], 'stars', tup[1][1], 'words', tup[1][2] )
+
     for tup in iter:
-        # print(tup)
-        # exit(1)
-        redis_db.hmset(tup[0], {'num': tup[1], 'stars': tup[2], 'words': tup[3]} )
+        if redis_db.exists(tup[0]):
+            redis_db.hmset(tup[0], {'num': tup[1], 'stars': tup[2], 'words': tup[3]} )
+        else:
+          redis_db.lpush(tup[0], *list(tup[1:]))
+          # redis_db.hmset(tup[0], {'num': tup[1], 'stars': tup[2], 'words': tup[3]} )
+          # redis_db.hmset(tup[0], {'num': tup[1], 'stars': tup[2], 'words': tup[3]} )
+
 
 
 def create_map_keys_fn(line):
