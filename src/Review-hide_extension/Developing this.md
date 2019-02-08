@@ -1,3 +1,3 @@
 Quick overview:
 
-`manifest.json`
+`manifest.json`:
