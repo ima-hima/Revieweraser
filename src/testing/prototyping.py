@@ -1,85 +1,77 @@
-''' Prototype Spark functions before deployment. Also do some profiling. '''
+''' Run Spark.
+    This is expecting a .tsv file in the next directory up.
+    Current criteria for removal: two or more reviews that are 5 stars and have five or fewer words. '''
 
 # import com.datastax.spark.connector._
 
+from csv         import DictReader
 from pyspark     import SparkConf, SparkContext
 from pyspark.sql import SQLContext, SparkSession
 from subprocess  import call, check_output
 from time        import time
+from uuid        import uuid4
 
 import os
-# import pandas
+import pandas
 import redis
 
 
 # def nightly_update(input_tuple):
 #     spark_conf = SparkConf().setAppName("Batch processing")
 
-def read_parquet():
-    spark_conf = SparkConf().setAppName("Batch processing") #("spark.cores.max", "1")
-    sc         = SparkContext(conf=spark_conf)
+def original_input(input_tuple):
+    overall_start_time = time()
 
-    # SparkConf().set("spark.jars.packages","org.apache.hadoop:hadoop-aws:3.0.0-alpha3")
-    sc = SparkContext.getOrCreate()
+    redis_db = redis.Redis(host="10.0.0.13", port=6379, db=2)
+    redis_db.flushdb()
 
-    # sc._jsc.hadoopConfiguration().set("fs.s3.awsAccessKeyId", 'A')
-    # sc._jsc.hadoopConfiguration().set("fs.s3.awsSecretAccessKey", 's')
+    print('\nFile size:', input_tuple[1])
+    cur_start_time = time()
+    dataFile = sc.textFile('s3n://eric-ford-insight-19/original/' + input_tuple[0]) # Don't forget it's s3n, not s3.
+    header   = dataFile.first()
+    print('Time to read file:          ', round(time() - cur_start_time, 2), 'secs.')
+    print('Number of partitions:       ', dataFile.getNumPartitions())
 
-    sqlContext = SQLContext(sc)
-    df2 = sqlContext.read.parquet("s3n://amazon-reviews-pds/parquet/product_category=Books")
+    cur_start_time = time()
+    # create initial key:val
+    # keyed_data       = dataFile.map(create_map_keys_fn)
+    keyed_data       = dataFile.filter(lambda line: line != header).map(create_map_keys_fn)
+    # count appearances of each key in `keyed_data`
+    r = keyed_data.first()
+    print('Time to create original map:', round(time() - cur_start_time, 2), 'secs.')
+    print('Number of partitions:       ', keyed_data.getNumPartitions())
 
-    # overall_start_time = time()
+    cur_start_time = time()
+    # keyed_for_counts = dataFile.map(map_counts_fn)
+    keyed_for_counts = dataFile.filter(lambda line: line != header).map(map_counts_fn)
+    # get count of each user's reviews
+    counts           = keyed_for_counts.reduceByKey(count_keys)
+    r = counts.first()
+    print('Time to count keys:         ', round(time() - cur_start_time, 2), 'secs.')
+    print('Number of partitions:       ', counts.getNumPartitions())
 
-    # redis_db = redis.Redis(host="10.0.0.13", port=6379, db=2)
-    # redis_db.flushdb()
+    cur_start_time = time()
+    averages         = keyed_data.reduceByKey(average_reviews)
+    final            = counts.join(averages).map(concat_fn)
+    r = final.first()
+    print('Time to join counts:        ', round(time() - cur_start_time, 2), 'secs.')
+    print('Number of partitions:       ', final.getNumPartitions())
+    cur_start_time = time()
+    final.foreachPartition( redis_insert )
+    print('time to write to Redis:     ', round(time() - cur_start_time,2), 'secs.')
 
-    # print('\nFile size:', input_tuple[1])
-    # cur_start_time = time()
-    # dataFile = sc.textFile('s3n://eric-ford-insight-19/original/' + input_tuple[0]) # Don't forget it's s3n, not s3.
-    # header   = dataFile.first()
-    # print('Time to read file:          ', round(time() - cur_start_time, 2), 'secs.')
-    # print('Number of partitions:       ', dataFile.getNumPartitions())
+    print('\nTotal time:                 ', round(time() - overall_start_time,2), 'secs.' )
 
-    # cur_start_time = time()
-    # # create initial key:val
-    # # keyed_data       = dataFile.map(create_map_keys_fn)
-    # keyed_data       = dataFile.filter(lambda line: line != header).map(create_map_keys_fn)
-    # # count appearances of each key in `keyed_data`
-    # r = keyed_data.first()
-    # print('Time to create original map:', round(time() - cur_start_time, 2), 'secs.')
-    # print('Number of partitions:       ', keyed_data.getNumPartitions())
-
-    # cur_start_time = time()
-    # # keyed_for_counts = dataFile.map(map_counts_fn)
-    # keyed_for_counts = dataFile.filter(lambda line: line != header).map(map_counts_fn)
-    # # get count of each user's reviews
-    # counts           = keyed_for_counts.reduceByKey(count_keys)
-    # r = counts.first()
-    # print('Time to count keys:         ', round(time() - cur_start_time, 2), 'secs.')
-    # print('Number of partitions:       ', counts.getNumPartitions())
-
-    # cur_start_time = time()
-    # averages         = keyed_data.reduceByKey(average_reviews)
-    # final            = counts.join(averages).map(concat_fn)
-    # r = final.first()
-    # print('Time to join counts:        ', round(time() - cur_start_time, 2), 'secs.')
-    # print('Number of partitions:       ', final.getNumPartitions())
-    # cur_start_time = time()
-    # final.foreachPartition( redis_insert )
-    # print('time to write to Redis:     ', round(time() - cur_start_time,2), 'secs.')
-
-    # print('\nTotal time:                 ', round(time() - overall_start_time,2), 'secs.' )
-
-    # print()
-    # headers = ['user:', 'number of reviews:', 'average star rating:', 'average review length:']
-    # for item in final.take(10):
-    #     print( '{} {:<12} {} {:<2}   {} {:>}    {} {:>}'.format( headers[0], item[0],
-    #                                                              headers[1], item[1],
-    #                                                              headers[2], round(item[2]/item[1], 2),
-    #                                                              headers[3], round(item[3]/item[1], 2)
-    #                                                            )
-    #          )
-    # print()
+    print()
+    headers = ['user:', 'number of reviews:', 'average star rating:', 'average review length:']
+    for item in final.take(10):
+        print( '{} {:<12} {} {:<2}   {} {:>}    {} {:>}'.format( headers[0], item[0],
+                                                                 headers[1], item[1],
+                                                                 headers[2], round(item[2]/item[1], 2),
+                                                                 headers[3], round(item[3]/item[1], 2)
+                                                               )
+             )
+    print()
 
 
 def clear_s3_directories(input_list):
@@ -100,14 +92,14 @@ def redis_insert(iter):
     ''' Insert tuple (rdd) into Redis. Tuple is of form (key, [int, int, int]), where the ints are
         number of reviews, total star rating, total number of words, respectively. '''
     import redis
-    pass
+    # pass
     # from sys import exit
-    # redis_db = redis.Redis(host="10.0.0.13", port=6379, db=1)
+    redis_db = redis.Redis(host="10.0.0.13", port=6379, db=1)
     # a = open('countfiles/' + str(uuid4()), 'w')
     # a.close()
     # print(tup)
     # print(tup[0], 'num', tup[1][0], 'stars', tup[1][1], 'words', tup[1][2] )
-    # for tup in iter:
+    for tup in iter:
         # print(tup)
         # exit(1)
         # if redis_db.exists(tup[0]):
@@ -116,7 +108,7 @@ def redis_insert(iter):
         # else:
         # print(list(tup[1:]))
         # redis_db.lpush(tup[0], *list(tup[1:]))
-            # redis_db.hmset(tup[0], {'num': tup[1], 'stars': tup[2], 'words': tup[3]} )
+            redis_db.hmset(tup[0], {'num': tup[1], 'stars': tup[2], 'words': tup[3]} )
 
 
 def create_map_keys_fn(line):
@@ -144,6 +136,19 @@ def count_keys(accum, input_value):
     ''' Increment each time it's called. '''
     return accum + 1
 
+
+spark_conf = SparkConf().setAppName("Batch processing") #("spark.cores.max", "1")
+sc         = SparkContext(conf=spark_conf)
+
+# SparkConf().set("spark.jars.packages","org.apache.hadoop:hadoop-aws:3.0.0-alpha3")
+sc = SparkContext.getOrCreate()
+
+# sc._jsc.hadoopConfiguration().set("fs.s3.awsAccessKeyId", 'A')
+# sc._jsc.hadoopConfiguration().set("fs.s3.awsSecretAccessKey", 's')
+
+sqlContext = SQLContext(sc)
+df2 = sqlContext.read.parquet("s3n://amazon-reviews-pds/parquet/product_category=amazon_reviews_us_Musical_Instruments_v1_00")
+
 # for filename_tuple in [ ('amazon_reviews_us_Digital_Software_v1_00.tsv.gz',       '18MB'),
 #                         ('amazon_reviews_us_Musical_Instruments_v1_00.tsv.gz',    '184MB'),
 #                         ('amazon_reviews_us_Apparel_v1_00.tsv.gz',                '620MB'),
@@ -151,5 +156,9 @@ def count_keys(accum, input_value):
 #                         ('amazon_reviews_us_Wireless_v1_00.tsv.gz',               '1.6GB'),
 #                         ('amazon_reviews_us_Digital_Ebook_Purchase_v1_00.tsv.gz', '2.5GB'),
 #                       ]:
-read_parquet()
+    original_input(filename_tuple)
+
+# if(__name__ == "__main__"):
+#     original_input()
+
 
