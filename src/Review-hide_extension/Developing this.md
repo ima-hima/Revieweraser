@@ -1,0 +1,3 @@
+Quick overview:
+
+`manifest.json`:
