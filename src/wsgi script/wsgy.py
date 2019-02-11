@@ -9,48 +9,43 @@ from json import loads, dumps
 def application(environ, start_response):
     ''' Accept a list of values to look up in Redis db. Get results from redis for each of those values.
         Return results as JSON. '''
-    r = redis.Redis(host="52.72.55.132", port=6379, db=1)
-    input_ids = [29024061]
-    return_values = {}
-    for this_id in input_ids:
-        r.hmset(this_id, {'num': '1', 'stars': '2', 'words': '3'} )
-        a = r.hgetall(this_id)
-        this_dict = {}
-        for key in a:
-            this_dict[key.decode('utf-8')] = (a[key]).decode('utf-8')
-        return_values[this_id] = this_dict
 
     # Make sure there's something in there.
     # url   = urllib.request.Request.full_url
-    # query = urllib.parse.urlparse(url).query
+    # query = urllib.parse.urlparse(environ['QUERY_STRING'])).query
+    query_body = urllib.parse.parse_qs(environ['QUERY_STRING']) #environ['QUERY_STRING'])
 
-    reviews = '{\"reviews\":[18778586,23310293,3]}'
+    # reviews = '{\"reviews\":[18778586,23310293,3]}'
 
-    # request_body = urllib.parse.parse_qs('reviews=18778586') #environ['QUERY_STRING'])
-    # json_reviews  = loads(reviews) # At this point reviews ought to be a list of ints.
-    # return_values = {'reviews': []}
-    # for item in json_reviews['reviews']:
-    #     return_values['reviews'] += 5
-    # #     if redis.exists(item):
-    # #         return_values += r.get(item) # Each item is a hash {'num': int, 'stars': int, 'words': int} )
+    # check to make sure an actualy query came through
+    if not query_body:
+        return_values = {'hhh': 'yyy'}
+    else:
+        r = redis.Redis(host="52.72.55.132", port=6379, db=1)
+
+        # query_body is in form {query: answer, query: answer} loop over keys and put
+        user_ids = []
+        for user_id in query_body:
+            user_ids += query_body[user_id]
+        # Now I have list of user ids, loop over that and get resulsts from Redis
+        return_values = {}
+        for this_id in user_ids:
+            # get hash from Redis
+            from_redis_dict = r.hgetall(this_id)
+            interim_dict = {}
+            for key in from_redis_dict:
+                # All the keys in the Redis hash and their values must be decoded and put into a dictionary.
+                # This dictionary is then stored as the value in a dictionary with the user id as a key.
+                interim_dict[key.decode('utf-8')] = (from_redis_dict[key]).decode('utf-8')
+            return_values[this_id] = interim_dict
+
 
     # # Now, back to JSON
     json_output = dumps(return_values)
-    # json_output = str(json_reviews)
-    # json_output = "{\"reviews\":[1,2,3]}"
 
     status = '200 OK'
-    just_text = '{"500": "600", "this": { "this": "is text"}}'
-    html = bytes(json_output, encoding='utf-8')
+    html = bytes(json_output, encoding='utf-8') # This constant encoding and decoding is driving me crazy.
     response_header = [('Content-type','application/json')]
     start_response(status, response_header)
     return [html]
 
-    # status = '200 OK'
-    # output = bytes('<html>\n<body>\nHello World!\n' + str(sys.path) + '\n</body>\n</html>', encoding='utf-8')
-
-    # response_headers = [('Content-type', 'text/html'),
-    #                     ('Content-Length', str(len(output)))]
-    # start_response(status, response_headers)
-
-    # return [output]
