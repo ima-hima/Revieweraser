@@ -17,10 +17,9 @@ import os
 import redis
 
 
-# def nightly_update(input_tuple):
-#     spark_conf = SparkConf().setAppName("Batch processing")
-
-def using_databricks(input_tuple):
+def using_databricks(input_tuple, interim_profiling):
+    ''' Import file from S3 to a dataframe using databricks, then convert to an rdd. Do this to avoid
+        having a conditional in foreach loop to remove header. Also, can remove any extra columns. '''
     sqlContext = SQLContext(sc)
     overall_start_time = time()
 
@@ -31,10 +30,11 @@ def using_databricks(input_tuple):
         .createOrReplaceTempView("table1")
 
     rdd = sqlContext.sql("SELECT customer_id, star_rating, review_body FROM table1").rdd
-    process_data(rdd, "Using databricks", input_tuple[1], overall_start_time)
+    process_data(rdd, "Using databricks", input_tuple[1], overall_start_time, interim_profiling)
 
 
-def process_data(inputRDD, which_method, size, overall_start_time):
+def process_data(inputRDD, which_method, size, overall_start_time, interim_profiling):
+    ''' Accept an rdd as input. Do all necessary actions and transforms on rdd then insert into DB. '''
 
     print('\n\n**' + which_method + '**')
     print('\nFile size:', size)
@@ -43,33 +43,45 @@ def process_data(inputRDD, which_method, size, overall_start_time):
     # print( inputRDD.first() )
     print_updates('read file:', overall_start_time, inputRDD.getNumPartitions())
 
-    cur_start_time = time()
+    if interim_profiling:
+        cur_start_time = time()
     # create initial key:val
-    keyed_data       = inputRDD.map(create_map_keys_fn)
-    # count appearances of each key in `keyed_data`
-    r = keyed_data.first()
-    print_updates('create original map:', cur_start_time, keyed_data.getNumPartitions())
+    keyed_data = inputRDD.map(create_map_keys_fn)
+
+    # Here and below, call to first() is to force evaluation for profiling output. Is that slowing
+    # things down? Maybe, so put in condidional.
+    if interim_profiling:
+        r = keyed_data.first() # this to force lazy eval for timing
+        print_updates('create original map:', cur_start_time, keyed_data.getNumPartitions())
 
     # keyed_data = keyed_data.repartition(9)
-    cur_start_time = time()
-    # keyed_for_counts = inputRDD.map(map_counts_fn)
+    if interim_profiling:
+        cur_start_time = time()
+
+    # Determine how many reviews each reviewer has written.
     keyed_for_counts = inputRDD.map(map_counts_fn)
-    # get count of each user's reviews
     counts           = keyed_for_counts.reduceByKey(count_keys)
-    r = counts.first()
-    print_updates('count keys:', cur_start_time, counts.getNumPartitions())
+    if interim_profiling:
+        r = counts.first() # this to force lazy eval for timing
+        print_updates('count keys:', cur_start_time, counts.getNumPartitions())
 
+    # Count total stars and total word count for each user, to be used eventually for sum_review_values.
     # keyed_data = keyed_data.repartition(4)
-    # keyed_data = keyed_data.repartition(4)
-    cur_start_time = time()
-    averages       = keyed_data.reduceByKey(average_reviews)
-    r = averages.first()
-    print_updates('average', cur_start_time, averages.getNumPartitions())
+    if interim_profiling:
+        cur_start_time = time()
+    sum_review_values = keyed_data.reduceByKey(sum_review_values)
+    if interim_profiling:
+        r = sum_review_values.first()
+        print_updates('average', cur_start_time, sum_review_values.getNumPartitions())
 
-    cur_start_time = time()
-    final          = counts.join(averages).map(concat_fn)
-    r = final.first()
-    print_updates('join counts:', cur_start_time, final.getNumPartitions())
+    # Now do join between per user counts and the number of reviews a user has written, so we can add to DB. After this the data should be in the form
+    # (user_id, num_reviews, total_stars, total_words)
+    if interim_profiling:
+        cur_start_time = time()
+    final = counts.join(sum_review_values).map(concat_fn)
+    if interim_profiling:
+        r = final.first()
+        print_updates('join counts:', cur_start_time, final.getNumPartitions())
 
 
     # final = final.repartition(4)
@@ -91,56 +103,61 @@ def process_data(inputRDD, which_method, size, overall_start_time):
     print()
 
 
-
-
-
-def print_updates(what_we_did, current_time, partitions):
-    print('Time to {:<21}{} {}'.format(what_we_did, round(time() - current_time, 2), 'secs.'))
-    print('{:<29}{}'.format('Number of partitions:', partitions))
-
-
-def without_databricks(input_tuple):
+def without_databricks(input_tuple, interim_profiling):
+    ''' Import a file from S3 directly to an rdd. Process that rdd and write out to Redis DB. '''
     overall_start_time = time()
 
     print('\n\n**without databricks**')
     print('\nFile size:', input_tuple[1])
     cur_start_time = time()
-    dataFile = sc.textFile('s3a://eric-ford-insight-19/original/' + input_tuple[0]) # Don't forget it's s3a, not s3.
-    dataFile = dataFile.repartition(6)
-    header   = dataFile.first()
-    print_updates('read file:', overall_start_time, inputRDD.getNumPartitions())
-    print('Time to read file:          ', round(time() - cur_start_time, 2), 'secs.')
-    print('Number of partitions:       ', dataFile.getNumPartitions())
+    originalRDD = sc.textFile('s3a://eric-ford-insight-19/original/' + input_tuple[0]) # Don't forget it's s3a, not s3.
+    # originalRDD = originalRDD.repartition(6)
+    header      = originalRDD.first()
+    print_updates('read file:', overall_start_time, originalRDD.getNumPartitions())
 
-    cur_start_time = time()
-    # create initial key:val
-    # keyed_data       = dataFile.map(create_map_keys_fn)
-    keyed_data       = dataFile.filter(lambda line: line != header).map(create_map_keys_fn)
-    # count appearances of each key in `keyed_data`
-    r = keyed_data.first() # this to force lazy eval for timing
-    print('Time to create original map:', round(time() - cur_start_time, 2), 'secs.')
-    print('Number of partitions:       ', keyed_data.getNumPartitions())
+    # Here and below, call to first() is to force evaluation for profiling output. Is that slowing
+    # things down? Maybe, so put in conditional.
+    if interim_profiling:
+        cur_start_time = time()
 
-    cur_start_time = time()
-    # keyed_for_counts = dataFile.map(map_counts_fn)
-    keyed_for_counts = dataFile.filter(lambda line: line != header).map(map_counts_fn)
-    # get count of each user's reviews
+    # create initial key:val. After this rows will be (user_id, [star rating, number of words])
+    keyed_data = originalRDD.filter(lambda line: line != header).map(create_map_keys_idx_fn)
+
+    if interim_profiling:
+        r = keyed_data.first() # this to force lazy eval for timing
+        print_updates('create original map:', cur_start_time, keyed_data.getNumPartitions())
+
+    # Determine how many reviews each reviewer has written.
+    if interim_profiling:
+        cur_start_time = time()
+    keyed_for_counts = originalRDD.filter(lambda line: line != header).map(map_counts_rdd_fn)
     counts           = keyed_for_counts.reduceByKey(count_keys)
-    r = counts.first() # this to force lazy eval for timing
-    print('Time to count keys:         ', round(time() - cur_start_time, 2), 'secs.')
-    print('Number of partitions:       ', counts.getNumPartitions())
+    if interim_profiling:
+        r = counts.first() # this to force lazy eval for timing
+        print_updates('count keys:', cur_start_time, keyed_for_counts.getNumPartitions())
 
-    cur_start_time = time()
-    averages         = keyed_data.reduceByKey(average_reviews)
-    final            = counts.join(averages).map(concat_fn)
-    r = final.first() # this to force lazy eval for timing
-    print('Time to join counts:        ', round(time() - cur_start_time, 2), 'secs.')
-    print('Number of partitions:       ', final.getNumPartitions())
+    # Count total stars and total word count for each user, to be used eventually for sum_review_values.
+    if interim_profiling:
+        cur_start_time = time()
+    per_review_totals = keyed_data.reduceByKey(sum_review_values)
+    if interim_profiling:
+        r = per_review_totals.first()
+        print_updates('totaling counts per review:', cur_start_time, per_review_totals.getNumPartitions())
+
+    # Now do join between per user counts and the number of reviews a user has written, so we can add to DB. After this the data should be in the form
+    # (user_id, num_reviews, total_stars, total_words)
+    if interim_profiling:
+        cur_start_time = time()
+    final = counts.join(per_review_totals).map(concat_fn)
+    if interim_profiling:
+        r = final.first() # this to force lazy eval for timing
+        print_updates('join:', cur_start_time, counts.getNumPartitions())
+
     cur_start_time = time()
     final.foreachPartition( redis_insert )
-    print('time to write to Redis:     ', round(time() - cur_start_time,2), 'secs.')
+    print_updates('write to Redis:', cur_start_time, final.getNumPartitions())
 
-    print('\nTotal time:                 ', round(time() - overall_start_time,2), 'secs.' )
+    print('{:<29}{} {}'.format('\nTotal time:', round(time() - overall_start_time, 2), 'secs.'))
 
     print()
     headers = ['user:', 'number of reviews:', 'average star rating:', 'average review length:']
@@ -155,6 +172,7 @@ def without_databricks(input_tuple):
 
 
 
+# I haven't had a chance to actually try this yet.
 # Consider moving some of this out to helper fns. Certainly do it if using_tsvs() comes back online.
 def using_parquet(input_tuple):
     overall_start_time = time()
@@ -190,8 +208,8 @@ def using_parquet(input_tuple):
     print('Number of partitions:       ', counts.getNumPartitions())
 
     cur_start_time = time()
-    averages         = keyed_data.reduceByKey(average_reviews)
-    final            = counts.join(averages).map(concat_fn)
+    sum_review_values         = keyed_data.reduceByKey(sum_review_values)
+    final            = counts.join(sum_review_values).map(concat_fn)
     r = final.first()
     print('Time to join counts:        ', round(time() - cur_start_time, 2), 'secs.')
     print('Number of partitions:       ', final.getNumPartitions())
@@ -204,7 +222,7 @@ def using_parquet(input_tuple):
     print()
     headers = ['user:', 'number of reviews:', 'average star rating:', 'average review length:']
     for item in final.take(10):
-        print( '{} {:<12} {} {:<2}   {} {:>}    {} {:>}'.format( headers[0], item[0],
+        print( '{} {:<12} {} {:<2}   {} {:>}    {} {:>5.2f}'.format( headers[0], item[0],
                                                                  headers[1], item[1],
                                                                  headers[2], round(item[2]/item[1], 2),
                                                                  headers[3], round(item[3]/item[1], 2)
@@ -213,9 +231,14 @@ def using_parquet(input_tuple):
     print()
 
 
+def print_updates(what_we_did, current_time, partitions):
+    ''' Print out profiling info. '''
+    print('Time to {:<21}{} secs.'.format(what_we_did, round(time() - current_time, 2)))
+    print('{:<29}{}'.format('Number of partitions:', partitions))
+
 
 def clear_s3_directories(input_list):
-    ''' Steps through S3 bucket and removes any directoris and directory pointers, because script will hang
+    ''' Step through S3 bucket and remove any directories and directory pointers, because script will hang
         if it attempts to write into directory that already exists. '''
     # for loop is in case I decide to have multiple outputs later
     def file_exists(filename):
@@ -234,18 +257,24 @@ def redis_insert(iter):
     import redis
     redis_db = redis.Redis(host="10.0.0.13", port=6379, db=1)
     for tup in iter:
-        # if redis_db.exists(tup[0]):
-        #     redis_db.hincrby(tup[0], 'num',   tup[1])
-        #     redis_db.hincrby(tup[0], 'stars', tup[2])
-        #     redis_db.hincrby(tup[0], 'words', tup[3])
-        # else:
+        if redis_db.exists(tup[0]):
+            redis_db.hincrby(tup[0], 'num',   tup[1])
+            redis_db.hincrby(tup[0], 'stars', tup[2])
+            redis_db.hincrby(tup[0], 'words', tup[3])
+        else:
             redis_db.hmset(tup[0], {'num': tup[1], 'stars': tup[2], 'words': tup[3]} )
 
 
 def create_map_keys_fn(line):
-    ''' Return a tuple with key : val = user_id : [star rating, number of words]. '''
+    ''' Return a tuple (user_id, [star rating, number of words]). '''
     print(line)
-    return line['customer_id'], [int(line['star_rating']), str(line['review_body']).count(' ') + 1]
+    return (line['customer_id'], [int(line['star_rating']), str(line['review_body']).count(' ') + 1])
+
+
+def create_map_keys_idx_fn(line):
+    ''' Same as create_map_keys_fn, but using indices rather than keys. '''
+    line = line.split('\t')
+    return (line[1], [int(line[7]), line[13].count(' ') + 1])
 
 
 def map_counts_fn(line):
@@ -253,45 +282,80 @@ def map_counts_fn(line):
         each keys shows up in map. '''
     return line['customer_id'], 1
 
+
+def map_counts_rdd_fn(line):
+    ''' Same as map_counts_fn, but using indices rather than keys. '''
+    line = line.split('\t') # there's got to be a faster way
+    return (line[1], 1)
+
 def concat_fn(line):
-    ''' Receive a tuple of form (key, []) a Return a tuple with . '''
-    return line[0], line[1][0], line[1][1][0], line[1][1][1]
+    ''' Receive a tuple of form (key, [,(,)]) a Return a tuple (,,,) . '''
+    return (line[0], line[1][0], line[1][1][0], line[1][1][1])
 
 
-def average_reviews(accum, input_list):
-    ''' Actually, no longer averaging, just adding. '''
-    return [accum[0] + input_list[0], accum[1] + input_list[1]]
+def sum_review_values(accum, input_list):
+    ''' Get the values—star rating and word count—in a review and add to the accumulator. '''
+    return ([accum[0] + input_list[0], accum[1] + input_list[1]])
 
 
 def count_keys(accum, input_value):
-    ''' Increment each time it's called. '''
+    ''' Increment each time it's called. This will be used to get a total for how many times each
+        key appears. '''
     return accum + 1
 
 
-spark_conf = SparkConf().setAppName("Batch processing") #("spark.cores.max", "1")
-sc         = SparkContext(conf=spark_conf)
+def main():
+    ''' Set up options for prototype and profiling code. '''
+    spark_conf = SparkConf().setAppName("Batch processing") #("spark.cores.max", "1")
+    sc         = SparkContext(conf=spark_conf)
 
-# SparkConf().set("spark.jars.packages","org.apache.hadoop:hadoop-aws:3.0.0-alpha3")
-sc = SparkContext.getOrCreate()
+    sc = SparkContext.getOrCreate()
 
-# sc._jsc.hadoopConfiguration().set("fs.s3.awsAccessKeyId", 'A')
-# sc._jsc.hadoopConfiguration().set("fs.s3.awsSecretAccessKey", 's')
+    sqlContext = SQLContext(sc)
 
-sqlContext = SQLContext(sc)
-# df2 = sqlContext.read.parquet("s3n://amazon-reviews-pds/parquet/product_category=amazon_reviews_us_Musical_Instruments_v1_00")
+    for filename_tuple in [
+                            # ('amazon_reviews_us_Digital_Software_v1_00.tsv.gz',       '18MB'),
+                            ('amazon_reviews_us_Musical_Instruments_v1_00.tsv.gz',    '184MB'),
+                            # ('amazon_reviews_us_Apparel_v1_00.tsv.gz',                '620MB'),
+                            # ('amazon_reviews_us_Books_v1_02.tsv.gz',                  '1.2GB'),
+                            # ('amazon_reviews_us_Wireless_v1_00.tsv.gz',               '1.6GB'),
+                            # ('amazon_reviews_us_Digital_Ebook_Purchase_v1_00.tsv.gz', '2.5GB'),
+                          ]:
+        using_databricks(filename_tuple, False)
+        # without_databricks(filename_tuple, False)
 
-for filename_tuple in [ ('amazon_reviews_us_Digital_Software_v1_00.tsv.gz',       '18MB'),
-                        # ('amazon_reviews_us_Musical_Instruments_v1_00.tsv.gz',    '184MB'),
-                        # ('amazon_reviews_us_Apparel_v1_00.tsv.gz',                '620MB'),
-                        # ('amazon_reviews_us_Books_v1_02.tsv.gz',                  '1.2GB'),
-                        # ('amazon_reviews_us_Wireless_v1_00.tsv.gz',               '1.6GB'),
-                        # ('amazon_reviews_us_Digital_Ebook_Purchase_v1_00.tsv.gz', '2.5GB'),
-                      ]:
-    using_databricks(filename_tuple)
-    without_databricks(filename_tuple)
+if(__name__ == "__main__"):
+    main()
 
-# if(__name__ == "__main__"):
-#     original_input()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -326,8 +390,8 @@ def using_csv_rdd(input_tuple):
 
     exit(1)
     cur_start_time = time()
-    # create initial key:val
-    keyed_data       = dataFile.map(create_map_keys_fn)
+    # create initial key:val After this we'll have tuples (user_id, [star_rating, word_count])
+    keyed_data = dataFile.map(create_map_keys_fn)
     # count appearances of each key in `keyed_data`
     r = keyed_data.first()
     print_updates('create original map:', cur_start_time, dataFile.getNumPartitions())
@@ -336,13 +400,13 @@ def using_csv_rdd(input_tuple):
     # keyed_for_counts = dataFile.map(map_counts_fn)
     keyed_for_counts = dataFile.map(map_counts_fn)
     # get count of each user's reviews
-    counts           = keyed_for_counts.reduceByKey(count_keys)
+    counts = keyed_for_counts.reduceByKey(count_keys)
     r = counts.first()
     print_updates('count keys:', cur_start_time, dataFile.getNumPartitions())
 
     cur_start_time = time()
-    averages         = keyed_data.reduceByKey(average_reviews)
-    final            = counts.join(averages).map(concat_fn)
+    sum_review_values         = keyed_data.reduceByKey(sum_review_values)
+    final            = counts.join(sum_review_values).map(concat_fn)
     r = final.first()
     print_updates('join counts:', cur_start_time, dataFile.getNumPartitions())
 
