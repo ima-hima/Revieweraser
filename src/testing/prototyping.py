@@ -5,7 +5,7 @@
 # import com.datastax.spark.connector._
 
 from pyspark     import SparkConf, SparkContext
-from pyspark.sql import SQLContext, SparkSession
+from pyspark.sql import SQLContext
 from subprocess  import call, check_output
 from sys         import exit
 from time        import time

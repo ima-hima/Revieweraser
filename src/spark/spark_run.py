@@ -5,32 +5,34 @@
 # import com.datastax.spark.connector._
 
 from pyspark     import SparkConf, SparkContext
-from pyspark.sql import SQLContext, SparkSession
-from subprocess  import call, check_output
 
 import redis
 
 
 def main():
     ''' Loop over input files. This needs to be replaced with code that will loop over actual files in S3. '''
+
+    # first set up spark context
+    spark_conf = SparkConf().setAppName("Batch processing") #("spark.cores.max", "1")
+    sc         = SparkContext(conf=spark_conf)
+
     for file in [
                  'amazon_reviews_us_Digital_Software_v1_00.tsv.gz',
-                 'amazon_reviews_us_Musical_Instruments_v1_00.tsv.gz',
-                 'amazon_reviews_us_Apparel_v1_00.tsv.gz',
-                 'amazon_reviews_us_Books_v1_02.tsv.gz',
-                 'amazon_reviews_us_Wireless_v1_00.tsv.gz',
-                 'amazon_reviews_us_Digital_Ebook_Purchase_v1_00.tsv.gz',
-                ]
-    process_file(file)
+                 # 'amazon_reviews_us_Musical_Instruments_v1_00.tsv.gz',
+                 # 'amazon_reviews_us_Apparel_v1_00.tsv.gz',
+                 # 'amazon_reviews_us_Books_v1_02.tsv.gz',
+                 # 'amazon_reviews_us_Wireless_v1_00.tsv.gz',
+                 # 'amazon_reviews_us_Digital_Ebook_Purchase_v1_00.tsv.gz',
+                ]:
+        process_file(file, sc)
 
 
-def process_file(input_filename):
+def process_file(input_filename, sc):
     ''' Import a file from S3 directly to an rdd. Process that rdd and write out to Redis DB. '''
     originalRDD = sc.textFile('s3a://eric-ford-insight-19/original/' + input_filename) # Don't forget it's s3a, not s3.
 
     # Storing the header because I'm going to filter on it later.
     header = originalRDD.first()
-    print_updates('read file:', overall_start_time, originalRDD.getNumPartitions())
 
     # create initial key:val. After this rows will be (user_id, [star rating, number of words])
     keyed_data = originalRDD.filter(lambda line: line != header).map(create_map_keys_idx_fn)
