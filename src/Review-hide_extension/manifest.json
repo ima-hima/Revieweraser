@@ -3,7 +3,11 @@
     "version": "1.0",
     "description": "This allows the user to remove Amazon reviews deemed worthless by some user-defined criteria.",
     "options_page": "options.html",
-    "permissions": ["tabs", "declarativeContent", "storage"],
+    "permissions": [ "tabs",
+                     "declarativeContent",
+                     "storage",
+                     "https://*.storystreetconsulting.com/wsgi*"
+                   ],
     "background": {
       "scripts": ["jquery-3.3.1.min.js", "popup.js"],
       "persistent": false
