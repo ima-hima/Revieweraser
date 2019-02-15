@@ -4,8 +4,7 @@
 Revieweraser
 =============
 
-[![BSD3 license](https://img.shields.io/badge/license-BSD3-blue.svg)](https://github.com/ima-hima/Insight-DE-2019A-Project
-/blob/master/LICENSE)
+[![BSD3 license](https://img.shields.io/badge/license-BSD3-blue.svg)](https://github.com/ima-hima/Insight-DE-2019A-Project/blob/master/LICENSE)
 
 
 Python code to collect data on Amazon reviewers in an attempt to determine which reviewers write
@@ -27,14 +26,4 @@ to judge poor reviewers. Current criteria are:
 | `test`                      | profling and prototyping code            |
 
 
-
-
-
-
-#### TODOs
-
-1. Could be more modular
-1. The data structure is a little complicated. Making it an object would be nice.
-1. Not currently using Pythonic EAFP coding style vs. LBYL.
-1. Dictionary comprehension and row printing could be a little prettier.
-
+See READMEs in each src directory for module-specific notes.
