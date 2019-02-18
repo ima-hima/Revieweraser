@@ -12,7 +12,10 @@ consistently bad reviews. Through a Chrome extension a shopper can select some c
 to judge poor reviewers. Current criteria are:
 1. Reviewer consistently gives low reviews.
 1. Reviewer consistently gives high reviews.
-3. Reviewer consistently writes extemely short reviews.
+1. Reviewer consistently writes extemely short reviews.
+
+There are three sets of source:
+1.
 
 **Project status:** 0.9 release
 

@@ -6,24 +6,27 @@
 
 from pyspark    import SparkConf, SparkContext
 from subprocess import check_output
+from time       import time
 
 
 
 def main():
     ''' Loop over input files from S3. '''
-
+    start_time = time()
     # first set up spark context
-    spark_conf = SparkConf().setAppName("Batch processing") #("spark.cores.max", "1")
+    spark_conf = SparkConf().setAppName("Revieweraser")
     sc         = SparkContext(conf=spark_conf)
 
     # Call aws result is a space delimited string file names and metadata
     input_list = ['aws', 's3', 'ls', 's3://eric-ford-insight-19/original/']
     file_list  = check_output(input_list)
-    file_list  = str(files, encoding='utf-8').split('\n')
-
-    for f in file_list[1:-1]: # The first item is '0' and the last one is empty
-        process_file(file, sc)
-
+    file_list  = str(file_list, encoding='utf-8').split('\n')
+    for i in range(5): # Five times to make large data set
+        for line in file_list[1:-1]: # The first item is '0' and the last one is empty
+            file = line.split()[-1]  # the file name is the last item in the space-delimited string
+            print(str(i) + 'th time,', file)
+            process_file(file, sc)
+    print("total time:", time() - start_time)
 
 def process_file(input_filename, sc):
     ''' Import a file from S3 directly to an rdd. Process that rdd and write out to Redis DB. '''
@@ -39,6 +42,7 @@ def process_file(input_filename, sc):
 
     # Determine how many reviews each reviewer has written.
     keyed_for_counts = originalRDD.filter(lambda line: line != header).map(map_counts_rdd_fn)
+    keyed_for_counts = keyed_for_counts.repartition(5)    # repartitioning here speeds things up significantly
     counts           = keyed_for_counts.reduceByKey(count_keys)
 
     # Count total stars and total word count for each user, to be used eventually for sum_review_values.

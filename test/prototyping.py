@@ -6,6 +6,7 @@
 
 from pyspark     import SparkConf, SparkContext
 from pyspark.sql import SQLContext
+from pyspark.sql.types import *
 from subprocess  import call, check_output
 from sys         import exit
 from time        import time
@@ -17,17 +18,36 @@ import os
 import redis
 
 
-def using_databricks(input_tuple, interim_profiling):
+def using_databricks(input_tuple, sc, interim_profiling):
     ''' Import file from S3 to a dataframe using databricks, then convert to an rdd. Do this to avoid
         having a conditional in foreach loop to remove header. Also, can remove any extra columns. '''
     sqlContext = SQLContext(sc)
     overall_start_time = time()
 
+    schema = StructType([
+        StructField("marketplace",       StringType(),  True), # Last field is nullable.
+        StructField("customer_id",       IntegerType(), True),
+        StructField("review_id",         StringType(),  True),
+        StructField("product_id",        StringType(),  True),
+        StructField("product_parent",    IntegerType(), True),
+        StructField("product_title",     StringType(),  True),
+        StructField("product_category",  StringType(),  True),
+        StructField("star_rating",       IntegerType(), True),
+        StructField("helpful_votes",     IntegerType(), True),
+        StructField("total_votes",       IntegerType(), True),
+        StructField("vine",              StringType(),  True),
+        StructField("verified_purchase", StringType(),  True),
+        StructField("review_headline",   StringType(),  True),
+        StructField("review_body",       StringType(),  True),
+        StructField("review_date",       StringType(),  True),
+    ])
+
     df = sqlContext.read \
         .format('csv') \
         .options(header='true', delimiter='\t', mode='DROPMALFORMED') \
+        .schema(schema) \
         .load('s3a://eric-ford-insight-19/original/' + input_tuple[0]) \
-        .createOrReplaceTempView("table1")
+        .createOrReplaceTempView("table1") # This is creating a temporary sql-like table that I can query against.
 
     rdd = sqlContext.sql("SELECT customer_id, star_rating, review_body FROM table1").rdd
     process_data(rdd, "Using databricks", input_tuple[1], overall_start_time, interim_profiling)
@@ -39,8 +59,8 @@ def process_data(inputRDD, which_method, size, overall_start_time, interim_profi
     print('\n\n**' + which_method + '**')
     print('\nFile size:', size)
 
-    host, passwd, port, db = open(os.path.dirname(__file__) + 'redis-pass.txt').readline().split()
-    print(host)
+    host, passwd, port, db = open('redis-pass.txt').readline().split()
+    # print(host)
     # inputRDD = inputRDD.repartition(4)
     # print( inputRDD.first() )
     print_updates('read file:', overall_start_time, inputRDD.getNumPartitions())
@@ -62,6 +82,7 @@ def process_data(inputRDD, which_method, size, overall_start_time, interim_profi
 
     # Determine how many reviews each reviewer has written.
     keyed_for_counts = inputRDD.map(map_counts_fn)
+    keyed_for_counts = keyed_for_counts.repartition(5)    # repartitioning here speeds things up significantly
     counts           = keyed_for_counts.reduceByKey(count_keys)
     if interim_profiling:
         r = counts.first() # this to force lazy eval for timing
@@ -71,16 +92,16 @@ def process_data(inputRDD, which_method, size, overall_start_time, interim_profi
     # keyed_data = keyed_data.repartition(4)
     if interim_profiling:
         cur_start_time = time()
-    sum_review_values = keyed_data.reduceByKey(sum_review_values)
+    summed_review_values = keyed_data.reduceByKey(sum_review_values)
     if interim_profiling:
-        r = sum_review_values.first()
-        print_updates('average', cur_start_time, sum_review_values.getNumPartitions())
+        r = summed_review_values.first()
+        print_updates('average', cur_start_time, summed_review_values.getNumPartitions())
 
     # Now do join between per user counts and the number of reviews a user has written, so we can add to DB. After this the data should be in the form
     # (user_id, num_reviews, total_stars, total_words)
     if interim_profiling:
         cur_start_time = time()
-    final = counts.join(sum_review_values).map(concat_fn)
+    final = counts.join(summed_review_values).map(concat_fn)
     if interim_profiling:
         r = final.first()
         print_updates('join counts:', cur_start_time, final.getNumPartitions())
@@ -113,10 +134,10 @@ def without_databricks(input_tuple, sc, interim_profiling):
     print('\nFile size:', input_tuple[1])
 
     host, passwd, port, db = open('redis-pass.txt').readline().split()
-    print(host)
+    # print(host)
     cur_start_time = time()
     originalRDD = sc.textFile('s3a://eric-ford-insight-19/original/' + input_tuple[0]) # Don't forget it's s3a, not s3.
-    # originalRDD = originalRDD.repartition(6)
+    # originalRDD = originalRDD.repartition(5)
     header      = originalRDD.first()
     print_updates('read file:', overall_start_time, originalRDD.getNumPartitions())
 
@@ -127,6 +148,7 @@ def without_databricks(input_tuple, sc, interim_profiling):
 
     # create initial key:val. After this rows will be (user_id, [star rating, number of words])
     keyed_data = originalRDD.filter(lambda line: line != header).map(create_map_keys_idx_fn)
+    # keyed_data = keyed_data.repartition(5)
 
     if interim_profiling:
         r = keyed_data.first() # this to force lazy eval for timing
@@ -136,6 +158,7 @@ def without_databricks(input_tuple, sc, interim_profiling):
     if interim_profiling:
         cur_start_time = time()
     keyed_for_counts = originalRDD.filter(lambda line: line != header).map(map_counts_rdd_fn)
+    keyed_for_counts = keyed_for_counts.repartition(5)    # repartitioning here speeds things up significantly
     counts           = keyed_for_counts.reduceByKey(count_keys)
     if interim_profiling:
         r = counts.first() # this to force lazy eval for timing
@@ -219,7 +242,7 @@ def using_parquet(input_tuple):
 
     cur_start_time = time()
     sum_review_values         = keyed_data.reduceByKey(sum_review_values)
-    final            = counts.join(sum_review_values).map(concat_fn)
+    final             = counts.join(sum_review_values).map(concat_fn)
     r = final.first()
     print('Time to join counts:        ', round(time() - cur_start_time, 2), 'secs.')
     print('Number of partitions:       ', final.getNumPartitions())
@@ -329,7 +352,7 @@ def count_keys(accum, input_value):
 
 def main():
     ''' Set up options for prototype and profiling code. '''
-    spark_conf = SparkConf().setAppName("Batch processing") #("spark.cores.max", "1")
+    spark_conf = SparkConf().setAppName("Revieweraser") #("spark.cores.max", "1")
     sc         = SparkContext(conf=spark_conf)
 
     sc = SparkContext.getOrCreate()
@@ -338,13 +361,13 @@ def main():
 
     for filename_tuple in [
                             ('amazon_reviews_us_Digital_Software_v1_00.tsv.gz',       '18MB'),
-                            # ('amazon_reviews_us_Musical_Instruments_v1_00.tsv.gz',    '184MB'),
+                            ('amazon_reviews_us_Musical_Instruments_v1_00.tsv.gz',    '184MB'),
                             # ('amazon_reviews_us_Apparel_v1_00.tsv.gz',                '620MB'),
                             # ('amazon_reviews_us_Books_v1_02.tsv.gz',                  '1.2GB'),
                             # ('amazon_reviews_us_Wireless_v1_00.tsv.gz',               '1.6GB'),
                             # ('amazon_reviews_us_Digital_Ebook_Purchase_v1_00.tsv.gz', '2.5GB'),
                           ]:
-        # using_databricks(filename_tuple, False)
+        # using_databricks(filename_tuple, sc, False)
         without_databricks(filename_tuple, sc, True)
 
 if(__name__ == "__main__"):
