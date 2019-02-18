@@ -17,10 +17,42 @@
 // });
 
 
+// onload:
+//    user_ids = gather all user ids and ping server.
+//    for each of user_ids:
+//        if number of reviews > 10:
+//            compute averages, put in relevants_arr
+//            add fields for each of three criteria to relevants_arr
+
+// on update:
+//    we're turning on criterium_a:
+//        log which criterium to be updated
+//        for each of relevants_arr:
+//            for each of relevants_arr
+//            if match criterium_a:
+//                hide user
+//            update user[criterium_a] to true
+//    else we're turning off criterium_a:
+//        for each of relevants_arr:
+//            if user[criterium_a] is true and others are false:
+//                show user
+//            user[criterium_a] = false
+
 
 $(document).ready(function() {
 
-  var users =
+  var user_ids = {};
+  $( "a.a-profile" ).each(function() {
+    user_ids[get_url($(this).attr('href'))] =
+                                     {
+                                       'name':      1,
+                                       'num':       1,
+                                       'stars':     1,
+                                       'too_short': false,
+                                       'too_nice':  false,
+                                       'too_mean':  false,
+                                     };
+  });
 
   // for each input for listener:
        // I'm just going to assume that people with high average reviews aren't
@@ -44,40 +76,41 @@ $(document).ready(function() {
   function update(which_selector, val) {
     var reviewers = new Array(); // This will be turned into JSON and sent to the redis interface.
     $( "a.a-profile" ).each(function( idx ) {
-      var secondidx = $(this).attr('href').search('/ref'); // second index of the substring containing the user id
-      var user_id = $(this).attr('href').substring(26, secondidx); // it always starts at 25
-      reviewers.push(user_id);
+      reviewers.push( get_user_id( $(this).attr('href') ) );
+      get_
       if ($(this).attr('href').includes("AGLHTJEJHQQ763RAURZ2SRP2VKBA")) {
         $(this).parent().parent().css("display", "none");
       }
     });
   }
 
+  function get_user_id(url) {
+    var secondidx  = url.search('/ref'); // second index of the substring containing the user id
+    return url.substring(26, secondidx); // it always starts at 25
+  }
+
+
   function get_url() {
     var query_string = '?';
     var idx = 0;
     $( "a.a-profile" ).each(function() {
-      var secondidx = $(this).attr('href').search('/ref'); // second index of the substring containing the user id
-      var user_id   = $(this).attr('href').substring(26, secondidx); // it always starts at 25
-      query_string += ('id' + idx + '=' + user_id + '&');
+      query_string += ('id' + idx + '=' + get_user_id( $(this).attr('href') ) + '&');
       idx++;
     });
     return ('https://storystreetconsulting.com/wsgi' + query_string);
   }
 
   $.ajax({
-      dataType: 'json',
-      url: get_url(),
-      success: function(data) {
-        update()
-          console.log(JSON.stringify(data));
-
-
-      },
-      error: function(xhr, status, errorMsg) {
-          $("#results").append("error");
-          console.log(errorMsg);
-      }
+    dataType: 'json',
+    url: get_url(),
+    success: function(data) {
+      update()
+        console.log(JSON.stringify(data));
+    },
+    error: function(xhr, status, errorMsg) {
+      $("#results").append("error");
+      console.log(errorMsg);
+    }
   });
 
 

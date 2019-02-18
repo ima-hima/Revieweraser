@@ -1,6 +1,7 @@
 import cgi
 import redis
 import sys
+import os
 import urllib
 
 # import urllib.parse
@@ -17,11 +18,14 @@ def application(environ, start_response):
 
     # reviews = '{\"reviews\":[18778586,23310293,3]}'
 
-    # check to make sure an actualy query came through
+    # check to make sure an actual query came through
     if not query_body:
         return_values = {'hhh': 'yyy'}
     else:
-        r = redis.Redis(host="52.72.55.132", port=6379, db=1)
+        # pass
+        host, passwd, port, db = open(os.path.dirname(__file__) + '/../redis-pass.txt').readline().split()
+        # Pretty sure StrictRedis is just an alias of Redis
+        r = redis.StrictRedis(host=host, password=passwd, port=int(port), db=int(db))
 
         # query_body is in form {query: answer, query: answer} loop over keys and put
         user_ids = []
@@ -40,11 +44,12 @@ def application(environ, start_response):
             return_values[this_id] = interim_dict
 
 
-    # # Now, back to JSON
+    # # # Now, back to JSON
     json_output = dumps(return_values)
 
     status = '200 OK'
     html = bytes(json_output, encoding='utf-8') # This constant encoding and decoding is driving me crazy.
+    # html = bytes(host + ' ' + passwd + ' ' + port + ' ' + db, encoding='utf-8')
     response_header = [('Content-type','application/json')]
     start_response(status, response_header)
     return [html]
