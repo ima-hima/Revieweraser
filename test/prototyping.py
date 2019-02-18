@@ -39,6 +39,8 @@ def process_data(inputRDD, which_method, size, overall_start_time, interim_profi
     print('\n\n**' + which_method + '**')
     print('\nFile size:', size)
 
+    host, passwd, port, db = open(os.path.dirname(__file__) + 'redis-pass.txt').readline().split()
+    print(host)
     # inputRDD = inputRDD.repartition(4)
     # print( inputRDD.first() )
     print_updates('read file:', overall_start_time, inputRDD.getNumPartitions())
@@ -86,7 +88,7 @@ def process_data(inputRDD, which_method, size, overall_start_time, interim_profi
 
     # final = final.repartition(4)
     cur_start_time = time()
-    final.foreachPartition( redis_insert )
+    final.foreachPartition( lambda x: redis_insert(x, host, passwd, port, db) )
     print_updates('write to Redis:', cur_start_time, final.getNumPartitions())
 
     print('{:<29}{} {}'.format('\nTotal time:', round(time() - overall_start_time, 2), 'secs.'))
@@ -103,12 +105,15 @@ def process_data(inputRDD, which_method, size, overall_start_time, interim_profi
     print()
 
 
-def without_databricks(input_tuple, interim_profiling):
+def without_databricks(input_tuple, sc, interim_profiling):
     ''' Import a file from S3 directly to an rdd. Process that rdd and write out to Redis DB. '''
     overall_start_time = time()
 
     print('\n\n**without databricks**')
     print('\nFile size:', input_tuple[1])
+
+    host, passwd, port, db = open('redis-pass.txt').readline().split()
+    print(host)
     cur_start_time = time()
     originalRDD = sc.textFile('s3a://eric-ford-insight-19/original/' + input_tuple[0]) # Don't forget it's s3a, not s3.
     # originalRDD = originalRDD.repartition(6)
@@ -142,7 +147,7 @@ def without_databricks(input_tuple, interim_profiling):
     per_review_totals = keyed_data.reduceByKey(sum_review_values)
     if interim_profiling:
         r = per_review_totals.first()
-        print_updates('totaling counts per review:', cur_start_time, per_review_totals.getNumPartitions())
+        print_updates('total counts per review:', cur_start_time, per_review_totals.getNumPartitions())
 
     # Now do join between per user counts and the number of reviews a user has written, so we can add to DB. After this the data should be in the form
     # (user_id, num_reviews, total_stars, total_words)
@@ -154,7 +159,9 @@ def without_databricks(input_tuple, interim_profiling):
         print_updates('join:', cur_start_time, counts.getNumPartitions())
 
     cur_start_time = time()
-    final.foreachPartition( redis_insert )
+    final.foreachPartition( lambda x: redis_insert(x, host, passwd, port, db) )
+    # for i in range(10000):
+    #     redis_insert_test(i)
     print_updates('write to Redis:', cur_start_time, final.getNumPartitions())
 
     print('{:<29}{} {}'.format('\nTotal time:', round(time() - overall_start_time, 2), 'secs.'))
@@ -169,6 +176,9 @@ def without_databricks(input_tuple, interim_profiling):
                                                                )
              )
     print()
+
+
+
 
 
 
@@ -214,7 +224,7 @@ def using_parquet(input_tuple):
     print('Time to join counts:        ', round(time() - cur_start_time, 2), 'secs.')
     print('Number of partitions:       ', final.getNumPartitions())
     cur_start_time = time()
-    final.foreachPartition( redis_insert )
+    # final.foreachPartition( redis_insert )
     print('time to write to Redis:     ', round(time() - cur_start_time,2), 'secs.')
 
     print('\nTotal time:                 ', round(time() - overall_start_time,2), 'secs.' )
@@ -233,8 +243,8 @@ def using_parquet(input_tuple):
 
 def print_updates(what_we_did, current_time, partitions):
     ''' Print out profiling info. '''
-    print('Time to {:<21}{} secs.'.format(what_we_did, round(time() - current_time, 2)))
-    print('{:<29}{}'.format('Number of partitions:', partitions))
+    print('Time to {:<30}{} secs.'.format(what_we_did, round(time() - current_time, 2)))
+    print('{:<38}{}'.format('Number of partitions:', partitions))
 
 
 def clear_s3_directories(input_list):
@@ -251,18 +261,31 @@ def clear_s3_directories(input_list):
             call(['aws', 's3', 'rm', 's3://eric-ford-insight-19/spark_output_$folder$'])
 
 
-def redis_insert(iter):
+def redis_insert(iter, host, passwd, port, db):
     ''' Insert tuple (rdd) into Redis. Tuple is of form (key, [int, int, int]), where the ints are
         number of reviews, total star rating, total number of words, respectively. '''
     import redis
-    redis_db = redis.Redis(host="10.0.0.13", port=6379, db=1)
+    # redis_db = redis.Redis(host="10.0.0.13", port=6379, db=1)
+    redis_db = redis.StrictRedis(host=host, password=passwd, port=int(port), db=int(db))
     for tup in iter:
         if redis_db.exists(tup[0]):
+            # redis_db.hmset(tup[0], {'num': tup[1], 'stars': tup[2], 'words': tup[3]} )
             redis_db.hincrby(tup[0], 'num',   tup[1])
             redis_db.hincrby(tup[0], 'stars', tup[2])
             redis_db.hincrby(tup[0], 'words', tup[3])
         else:
             redis_db.hmset(tup[0], {'num': tup[1], 'stars': tup[2], 'words': tup[3]} )
+
+def redis_insert_test(i):
+    ''' Insert tuple (rdd) into Redis. Tuple is of form (key, [int, int, int]), where the ints are
+        number of reviews, total star rating, total number of words, respectively. '''
+    import redis
+    redis_db = redis.Redis(host="10.0.0.13", port=6379, db=0)
+    # start = time()
+
+    redis_db.hmset(i, {'num': 1, 'stars': 1, 'words': 1} )
+
+    # print( time() - start )
 
 
 def create_map_keys_fn(line):
@@ -314,15 +337,15 @@ def main():
     sqlContext = SQLContext(sc)
 
     for filename_tuple in [
-                            # ('amazon_reviews_us_Digital_Software_v1_00.tsv.gz',       '18MB'),
-                            ('amazon_reviews_us_Musical_Instruments_v1_00.tsv.gz',    '184MB'),
+                            ('amazon_reviews_us_Digital_Software_v1_00.tsv.gz',       '18MB'),
+                            # ('amazon_reviews_us_Musical_Instruments_v1_00.tsv.gz',    '184MB'),
                             # ('amazon_reviews_us_Apparel_v1_00.tsv.gz',                '620MB'),
                             # ('amazon_reviews_us_Books_v1_02.tsv.gz',                  '1.2GB'),
                             # ('amazon_reviews_us_Wireless_v1_00.tsv.gz',               '1.6GB'),
                             # ('amazon_reviews_us_Digital_Ebook_Purchase_v1_00.tsv.gz', '2.5GB'),
                           ]:
-        using_databricks(filename_tuple, False)
-        # without_databricks(filename_tuple, False)
+        # using_databricks(filename_tuple, False)
+        without_databricks(filename_tuple, sc, True)
 
 if(__name__ == "__main__"):
     main()
@@ -393,7 +416,7 @@ def using_csv_rdd(input_tuple):
     # create initial key:val After this we'll have tuples (user_id, [star_rating, word_count])
     keyed_data = dataFile.map(create_map_keys_fn)
     # count appearances of each key in `keyed_data`
-    r = keyed_data.first()
+    # r = keyed_data.first()
     print_updates('create original map:', cur_start_time, dataFile.getNumPartitions())
 
     cur_start_time = time()
@@ -401,13 +424,13 @@ def using_csv_rdd(input_tuple):
     keyed_for_counts = dataFile.map(map_counts_fn)
     # get count of each user's reviews
     counts = keyed_for_counts.reduceByKey(count_keys)
-    r = counts.first()
+    # r = counts.first()
     print_updates('count keys:', cur_start_time, dataFile.getNumPartitions())
 
     cur_start_time = time()
     sum_review_values         = keyed_data.reduceByKey(sum_review_values)
     final            = counts.join(sum_review_values).map(concat_fn)
-    r = final.first()
+    # r = final.first()
     print_updates('join counts:', cur_start_time, dataFile.getNumPartitions())
 
     cur_start_time = time()
