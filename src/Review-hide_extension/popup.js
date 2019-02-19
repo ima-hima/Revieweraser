@@ -28,14 +28,7 @@ $(document).ready(function() {
   //     wordSlider.toggle();
   // }
 
-  function sendToContent(which, val) {
-    // Send to content.js. Note that which is a jQuery selector.
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-      chrome.tabs.sendMessage(tabs[0].id, {selector: which, val: val}, function(response) {
-        console.log(response.farewell);
-      });
-    });
-  }
+
 
   // Now updated the slider values
   // First with min value
@@ -69,3 +62,11 @@ $(document).ready(function() {
 
 });
 
+function sendToContent(which, val) {
+    // Send to content.js. Note that which is a jQuery selector.
+    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+      chrome.tabs.sendMessage(tabs[0].id, {selector: which, val: val}, function(response) {
+        console.log(response.farewell);
+      });
+    });
+  }

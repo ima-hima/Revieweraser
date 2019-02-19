@@ -1,7 +1,7 @@
 # Insight-DE-2019A-Project
 
 
-Revieweraser
+*Reviewer*aser
 =============
 
 [![BSD3 license](https://img.shields.io/badge/license-BSD3-blue.svg)](https://github.com/ima-hima/Insight-DE-2019A-Project/blob/master/LICENSE)
@@ -14,7 +14,7 @@ to judge poor reviewers. Current criteria are:
 1. Reviewer consistently gives high reviews.
 3. Reviewer consistently writes extemely short reviews.
 
-**Project status:** 0.9 release
+**Project status:** 1.0 release
 
 | Directory                   | Description of Contents
 |:--------------------------- |:---------------------------------------- |

@@ -17,12 +17,13 @@
 // });
 
 
-// onload:
-//    user_ids = gather all user ids and ping server.
-//    for each of user_ids:
-//        if number of reviews > 10:
-//            compute averages, put in relevants_arr
-//            add fields for each of three criteria to relevants_arr
+// on load:
+  //    user_ids = gather all user ids and ping server.
+  //    for each of user_ids:
+  //        if number of reviews > 10:
+  //            compute averages, put in relevants_arr
+  //            add fields for each of three criteria to relevants_arr
+
 
 // on update:
 //    we're turning on criterium_a:
@@ -41,6 +42,8 @@
 
 $(document).ready(function() {
 
+  var relevants_arr; // This will be list of users who have > 10 reviews, i.e. relevant users.
+
   var user_ids = {};
   $( "a.a-profile" ).each(function() {
     user_ids[get_url($(this).attr('href'))] =
@@ -53,6 +56,7 @@ $(document).ready(function() {
                                        'too_mean':  false,
                                      };
   });
+
 
   // for each input for listener:
        // I'm just going to assume that people with high average reviews aren't
@@ -77,7 +81,7 @@ $(document).ready(function() {
     var reviewers = new Array(); // This will be turned into JSON and sent to the redis interface.
     $( "a.a-profile" ).each(function( idx ) {
       reviewers.push( get_user_id( $(this).attr('href') ) );
-      get_
+
       if ($(this).attr('href').includes("AGLHTJEJHQQ763RAURZ2SRP2VKBA")) {
         $(this).parent().parent().css("display", "none");
       }
@@ -90,6 +94,7 @@ $(document).ready(function() {
   }
 
 
+  // Create a url with GET query string for pinging web server
   function get_url() {
     var query_string = '?';
     var idx = 0;
@@ -100,18 +105,31 @@ $(document).ready(function() {
     return ('https://storystreetconsulting.com/wsgi' + query_string);
   }
 
+  var get_string = get_url(); // Need this to send data to ajax url, because it won't evaluate a fn.
+
+  // send url to server, get response, send it to
   $.ajax({
     dataType: 'json',
-    url: get_url(),
-    success: function(data) {
-      update()
-        console.log(JSON.stringify(data));
+    url: get_string,
+    success: function(return_data) {
+      $.each(return_data, function(index, value) {
+        console.log(index + " " + value);
+      });
+
+      console.log(JSON.stringify(return_data));
     },
     error: function(xhr, status, errorMsg) {
       $("#results").append("error");
       console.log(errorMsg);
     }
   });
+
+
+});
+
+
+
+
 
 
 
@@ -124,7 +142,7 @@ $(document).ready(function() {
   // console.log(JSON.stringify({
   //   value: reviewers
   // }));
-});
+
 
 // chrome.runtime.onMessage.addListener(
 //   function(request, sender, sendResponse) {
