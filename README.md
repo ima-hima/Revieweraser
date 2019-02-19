@@ -1,8 +1,8 @@
-<<<<<<< HEAD
 # *Reviewer*aser
 
 [![BSD3 license](https://img.shields.io/badge/license-BSD3-blue.svg)](https://github.com/ima-hima/Insight-DE-2019A-Project/blob/master/LICENSE)
 
+**Project status:** 1.0 release
 
 Python code to collect data on Amazon reviewers in an attempt to determine which reviewers write
 consistently bad reviews. Through a Chrome extension a shopper can select some criteria with which
@@ -11,6 +11,8 @@ to judge poor reviewers. Current criteria are:
 1. Reviewer consistently gives low reviews.
 1. Reviewer consistently gives high reviews.
 1. Reviewer consistently writes extemely short reviews.
+
+
 
 The project pipeline is:
 
@@ -31,7 +33,6 @@ There are three sets of source:
 
 For each of these source files, please see the respective `README` files in the src folders for pseudo code.
 
-**Project status:** 1.0 release
 
 | Directory                   | Description of Contents
 |:--------------------------- |:---------------------------------------- |
@@ -41,6 +42,4 @@ For each of these source files, please see the respective `README` files in the 
 | `src/wsgi script`           | wsgi server-side code for Apache         |
 | `run.sh`                    | shell script to run source               |
 | `test`                      | profling and prototyping code            |
-
-
 

@@ -1,6 +1,6 @@
-import cgi
 import redis
 import sys
+import os
 import urllib
 
 # import urllib.parse
@@ -11,22 +11,21 @@ def application(environ, start_response):
         Return results as JSON. '''
 
     # Make sure there's something in there.
-    # url   = urllib.request.Request.full_url
-    # query = urllib.parse.urlparse(environ['QUERY_STRING'])).query
     query_body = urllib.parse.parse_qs(environ['QUERY_STRING']) #environ['QUERY_STRING'])
 
-    # reviews = '{\"reviews\":[18778586,23310293,3]}'
-
-    # check to make sure an actualy query came through
+    # check to make sure an actual query came through
     if not query_body:
-        return_values = {'hhh': 'yyy'}
+        return_values = {'null': 'yyy'} # if no input is received, return null
     else:
-        r = redis.Redis(host="52.72.55.132", port=6379, db=1)
+        host, passwd, port, db = open(os.path.dirname(__file__) + '/../redis-pass.txt').readline().split()
+        # Pretty sure StrictRedis is just an alias of Redis
+        r = redis.StrictRedis(host=host, password=passwd, port=int(port), db=int(db))
 
         # query_body is in form {query: answer, query: answer} loop over keys and put
         user_ids = []
         for user_id in query_body:
             user_ids += query_body[user_id]
+
         # Now I have list of user ids, loop over that and get resulsts from Redis
         return_values = {}
         for this_id in user_ids:
@@ -40,7 +39,7 @@ def application(environ, start_response):
             return_values[this_id] = interim_dict
 
 
-    # # Now, back to JSON
+    # # # Now, back to JSON
     json_output = dumps(return_values)
 
     status = '200 OK'

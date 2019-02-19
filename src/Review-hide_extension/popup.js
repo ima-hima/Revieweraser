@@ -15,57 +15,56 @@ $(document).ready(function() {
   var wordSlider      = $("#wordSlider");
   var wordCount       = $("#wordCount");
   var lowReviewCheck  = $("#lowReviewCheck");
-  var highReviewcheck = $("#highReviewcheck");
+  var highReviewCheck = $("#highReviewCheck");
   var wordCountCheck  = $("#wordCountCheck");
 
   minOutput.innerHTML = minSlider.value; // Display the default slider value
   maxOutput.innerHTML = maxSlider.value;
   wordCount.innerHTML = wordSlider.value;
 
-  // $('.slider').slider({ disabled: true });
+  // Check for button selection
+  $("#lowReviewCheck").on('input', function() {
+    console.log($(this));
+    sendToContent('lowReviewCheck', $(this).is(':checked'), minSlider.val())
+  });
 
-  // wordCountCheck.oninput = function() {
-  //     wordSlider.toggle();
-  // }
+  $("#highReviewCheck").on('input', function() {
+    sendToContent('highReviewCheck', $(this).is(':checked'), maxSlider.val())
+  });
 
-  function sendToContent(which, val) {
-    // Send to content.js. Note that which is a jQuery selector.
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-      chrome.tabs.sendMessage(tabs[0].id, {selector: which, val: val}, function(response) {
-        console.log(response.farewell);
-      });
-    });
-  }
+  $("#wordCountCheck").on('input', function() {
+    sendToContent('wordCountCheck', $(this).is(':checked'), wordSlider.val())
+  });
 
-  // Now updated the slider values
+
+  // Now update the slider values
   // First with min value
   $("#minSlider").on('input', function() {
     // Show min value in display
     $("#curMinVal").html($(this).val());
-    sendToContent('#curMinVal', $(this).val())
+    sendToContent('curMinVal', lowReviewCheck.is(':checked'), $(this).val())
   });
 
   // Same thing, now with max value
   $("#maxSlider").on('input', function() {
     // Show min value in display
     $("#curMaxVal").html($(this).val());
-    sendToContent('#curMaxVal', $(this).val())
+    sendToContent('curMaxVal', highReviewCheck.is(':checked'), $(this).val())
   });
-
 
   // Finally word slider
   $("#wordSlider").on('input', function() {
     // Show min value in display
     $("#wordCount").html($(this).val());
-    sendToContent('#wordCount', $(this).val())
+    sendToContent('wordCount', wordCountCheck.is(':checked'), $(this).val())
   });
-
-
-  //   chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-  //   chrome.tabs.sendMessage(tabs[0].id, {greeting: "hello"}, function(response) {
-  //     console.log(response.farewell);
-  //   });
-  // });
-
 });
 
+function sendToContent(which, checkbox, sliderVal) {
+    // Send to content.js. Note that which is a jQuery selector.
+    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+      chrome.tabs.sendMessage(tabs[0].id, {selector: which, checkbox: checkbox, sliderVal: sliderVal}, function(response) {
+        console.log(response.farewell);
+      });
+    });
+  }

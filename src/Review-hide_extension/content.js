@@ -1,26 +1,33 @@
 'use strict';
 
-// chrome.runtime.onInstalled.addListener(function() {
-//   chrome.storage.sync.set({color: '#3aa757'}, function() {
-//     console.log("The color is green.");
-//   });
 
-//   chrome.declarativeContent.onPageChanged.removeRules(undefined, function() {
-//       chrome.declarativeContent.onPageChanged.addRules([{
-//         conditions: [new chrome.declarativeContent.PageStateMatcher({
-//           pageUrl: {hostEquals: 'www.amazon.com'},
-//         })
-//         ],
-//             actions: [new chrome.declarativeContent.ShowPageAction()]
-//       }]);
-//   });
-// });
+// on load:
+  //    user_ids = gather all user ids and ping server.
+  //    for each of user_ids:
+  //        if number of reviews > 10:
+  //            compute averages, put in relevants_arr
+  //            add fields for each of three criteria to relevants_arr
 
+
+// on update:
+//    we're turning on criterium_a:
+//        log which criterium to be updated
+//        for each of relevants_arr:
+//            for each of relevants_arr
+//            if match criterium_a:
+//                hide user
+//            update user[criterium_a] to true
+//    else we're turning off criterium_a:
+//        for each of relevants_arr:
+//            if user[criterium_a] is true and others are false:
+//                show user
+//            user[criterium_a] = false
 
 
 $(document).ready(function() {
 
-  var users =
+  var relevants_arr = {}; // This will be list of users who have > 10 reviews, i.e. relevant users.
+
 
   // for each input for listener:
        // I'm just going to assume that people with high average reviews aren't
@@ -31,75 +38,138 @@ $(document).ready(function() {
 
   chrome.runtime.onMessage.addListener(
     function(request, sender, sendResponse) {
+      // console.log(request);
       // console.log(sender.tab ?
       //             "from a content script:" + sender.tab.url :
       //             "from the extension");
       // alert(request.selector + ' ' + request.val);
-      update(request.selector, request.val);
+      update(request.selector, request.checkbox, request.sliderVal);
       sendResponse({farewell: "nope"});
       return true;
     }
   );
 
-  function update(which_selector, val) {
-    var reviewers = new Array(); // This will be turned into JSON and sent to the redis interface.
-    $( "a.a-profile" ).each(function( idx ) {
-      var secondidx = $(this).attr('href').search('/ref'); // second index of the substring containing the user id
-      var user_id = $(this).attr('href').substring(26, secondidx); // it always starts at 25
-      reviewers.push(user_id);
-      if ($(this).attr('href').includes("AGLHTJEJHQQ763RAURZ2SRP2VKBA")) {
-        $(this).parent().parent().css("display", "none");
+  function selector_update(which_selector, checkbox, sliderVal) {
+    // step through relevants_arr
+      // We have to check both that slider is active and that it has correct value.
+      // We can't just set to active or now, because of else clause in `update()`.
+      // If checkbox is off, it's off. If it's on we also need to check the slider value.
+    $.each(relevants_arr, function(index, object) {
+      if (which_selector == 'wordCountCheck') {
+        object['wordCountCheck'] = (checkbox && sliderVal > object['avgWords']);
+      } else if (which_selector == 'lowReviewCheck') {
+        object['lowReviewCheck'] = (checkbox && sliderVal > object['avgStars']);
+      } else {
+        object['highReviewCheck'] = (checkbox && sliderVal < object['avgStars']);
       }
     });
   }
 
+  // For each of the relevants_arr, if the criterium of the which selector matches, hide it.
+  // Remember that I need to check for true/false values for all three selector values.
+  // which_selector possibilities:
+    // lowReviewCheck
+    // highReviewCheck
+    // wordCountCheck
+    // curMinVal
+    // curMaxVal
+    // wordCount
+  function update(which_selector, checkbox, sliderVal) {
+    // if it's a checkbox
+    if (which_selector == 'wordCountCheck' ||
+        which_selector == 'lowReviewCheck' ||
+        which_selector == 'highReviewCheck'
+       ) {
+    selector_update(which_selector, checkbox, sliderVal);
+  } else {
+      // At this point the checkbox is either on or off. If the checkbox is what changed ignore all this.
+      // step through relevants_arr
+          // if relevant value matches and the checkbox is checked
+            // set checkbox to true
+          // else (no longer a match)
+            // set checkbox to false
+      // step through a.a-profile
+        // if element has any true in relevants_arr
+          // hide it
+        // else
+          // show it
+      $.each(relevants_arr, function(index, object) {
+        if (which_selector == 'wordCount') {
+          if (object['avgWords'] <= sliderVal && checkbox) {
+            object['wordCountCheck'] = true;
+          } else {
+            object['wordCountCheck'] = false;
+          }
+        } else if (which_selector == 'curMinVal') {
+          if (object['avgStars'] <= sliderVal && checkbox) {
+            object['lowReviewCheck'] = true;
+          } else {
+            object['lowReviewCheck'] = false;
+          }
+        } else { // must be maxValue
+          if (object['avgStars'] > sliderVal && checkbox) {
+            object['highReviewCheck'] = true;
+          } else {
+            object['highReviewCheck'] = false;
+          }
+        }
+      });
+    }
+    $('.a-profile').each(function() {
+      var user_id = get_user_id( $(this).attr('href') );
+      if (user_id in relevants_arr) {
+        var object = relevants_arr[user_id];
+        if (object['lowReviewCheck'] || object['highReviewCheck'] || object['wordCountCheck']) {
+          $(this).parent().parent().css("display", "none");
+        } else {
+          $(this).parent().parent().css("display", "contents");
+        }
+      }
+    });
+
+  function get_user_id(input_url) {
+    var secondidx  = input_url.search('/ref'); // second index of the substring containing the user id
+    return input_url.substring(26, secondidx); // it always starts at 25
+  }
+
+
+  // Create a url with GET query string for pinging web server
   function get_url() {
     var query_string = '?';
     var idx = 0;
     $( "a.a-profile" ).each(function() {
-      var secondidx = $(this).attr('href').search('/ref'); // second index of the substring containing the user id
-      var user_id   = $(this).attr('href').substring(26, secondidx); // it always starts at 25
-      query_string += ('id' + idx + '=' + user_id + '&');
+      query_string += ('id' + idx + '=' + get_user_id( $(this).attr('href') ) + '&');
       idx++;
     });
     return ('https://storystreetconsulting.com/wsgi' + query_string);
   }
 
+  var get_string = get_url(); // Need this to send data to ajax url, because it won't evaluate a fn.
+
+  // send url to server, get response, save it into array of relevant users
   $.ajax({
-      dataType: 'json',
-      url: get_url(),
-      success: function(data) {
-        update()
-          console.log(JSON.stringify(data));
+    dataType: 'json',
+    url: get_string,
+    success: function(return_data) {
+      $.each(return_data, function(index, value) {
+        if (value['num'] >= 10) {  // relevant users have at least 10 reviews
+          relevants_arr[index] = {  // these divisions should be safe, because we know there are reviews
+                                    'avgStars':        value['stars'] / value['num'],
+                                    'avgWords':        value['words'] / value['num'],
+                                    'lowReviewCheck':  false,
+                                    'highReviewCheck': false,
+                                    'wordCountCheck':  false
+                                   };
+        }
+      });
 
-
-      },
-      error: function(xhr, status, errorMsg) {
-          $("#results").append("error");
-          console.log(errorMsg);
-      }
+    },
+    error: function(xhr, status, errorMsg) {
+      $("#results").append("error");
+      console.log(errorMsg);
+    }
   });
 
 
-
-  // var xhr = new XMLHttpRequest();
-  // xhr.open("POST", 'https://www.storystreetconsulting.com/wsgi', true);
-  // xhr.setRequestHeader('Content-Type', 'application/json');
-  // xhr.send(JSON.stringify({
-  //   value: reviewers
-  // }));
-  // console.log(JSON.stringify({
-  //   value: reviewers
-  // }));
 });
 
-// chrome.runtime.onMessage.addListener(
-//   function(request, sender, sendResponse) {
-//     console.log(sender.tab ?
-//                 "from a content script:" + sender.tab.url :
-//                 "from the extension");
-//     alert(request.greeting);
-//     sendResponse({farewell: "goodbye"});
-//     // return true;
-//   }
-// );
