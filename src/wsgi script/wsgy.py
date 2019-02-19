@@ -15,7 +15,7 @@ def application(environ, start_response):
 
     # check to make sure an actual query came through
     if not query_body:
-        return_values = {'hhh': 'yyy'} # This needs to be dealt with better. This is pretty fragile.
+        return_values = {'null': 'yyy'} # if no input is received, return null
     else:
         host, passwd, port, db = open(os.path.dirname(__file__) + '/../redis-pass.txt').readline().split()
         # Pretty sure StrictRedis is just an alias of Redis
