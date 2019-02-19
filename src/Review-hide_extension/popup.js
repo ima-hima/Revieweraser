@@ -25,15 +25,15 @@ $(document).ready(function() {
   // Check for button selection
   $("#lowReviewCheck").on('input', function() {
     console.log($(this));
-    sendToContent('lowReviewCheck', $(this).is(':checked'), minSlider.val())
+    sendToContent('lowReviewCheck', $(this).is(':checked'), minSlider.val());
   });
 
   $("#highReviewCheck").on('input', function() {
-    sendToContent('highReviewCheck', $(this).is(':checked'), maxSlider.val())
+    sendToContent('highReviewCheck', $(this).is(':checked'), maxSlider.val());
   });
 
   $("#wordCountCheck").on('input', function() {
-    sendToContent('wordCountCheck', $(this).is(':checked'), wordSlider.val())
+    sendToContent('wordCountCheck', $(this).is(':checked'), wordSlider.val());
   });
 
 
@@ -42,21 +42,21 @@ $(document).ready(function() {
   $("#minSlider").on('input', function() {
     // Show min value in display
     $("#curMinVal").html($(this).val());
-    sendToContent('curMinVal', lowReviewCheck.is(':checked'), $(this).val())
+    sendToContent('curMinVal', lowReviewCheck.is(':checked'), $(this).val());
   });
 
   // Same thing, now with max value
   $("#maxSlider").on('input', function() {
     // Show min value in display
     $("#curMaxVal").html($(this).val());
-    sendToContent('curMaxVal', highReviewCheck.is(':checked'), $(this).val())
+    sendToContent('curMaxVal', highReviewCheck.is(':checked'), $(this).val());
   });
 
   // Finally word slider
   $("#wordSlider").on('input', function() {
     // Show min value in display
     $("#wordCount").html($(this).val());
-    sendToContent('wordCount', wordCountCheck.is(':checked'), $(this).val())
+    sendToContent('wordCount', wordCountCheck.is(':checked'), $(this).val());
   });
 });
 

@@ -80,8 +80,8 @@ $(document).ready(function() {
         which_selector == 'lowReviewCheck' ||
         which_selector == 'highReviewCheck'
        ) {
-    selector_update(which_selector, checkbox, sliderVal);
-  } else {
+      selector_update(which_selector, checkbox, sliderVal);
+    } else {
       // At this point the checkbox is either on or off. If the checkbox is what changed ignore all this.
       // step through relevants_arr
           // if relevant value matches and the checkbox is checked
@@ -115,17 +115,18 @@ $(document).ready(function() {
         }
       });
     }
-    $('.a-profile').each(function() {
-      var user_id = get_user_id( $(this).attr('href') );
-      if (user_id in relevants_arr) {
-        var object = relevants_arr[user_id];
-        if (object['lowReviewCheck'] || object['highReviewCheck'] || object['wordCountCheck']) {
-          $(this).parent().parent().css("display", "none");
-        } else {
-          $(this).parent().parent().css("display", "contents");
-        }
+  }
+  $('.a-profile').each(function() {
+    var user_id = get_user_id( $(this).attr('href') );
+    if (user_id in relevants_arr) {
+      var object = relevants_arr[user_id];
+      if (object['lowReviewCheck'] || object['highReviewCheck'] || object['wordCountCheck']) {
+        $(this).parent().parent().css("display", "none");
+      } else {
+        $(this).parent().parent().css("display", "contents");
       }
-    });
+    }
+  });
 
   function get_user_id(input_url) {
     var secondidx  = input_url.search('/ref'); // second index of the substring containing the user id
