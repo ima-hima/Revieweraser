@@ -360,8 +360,9 @@ def main():
     sqlContext = SQLContext(sc)
 
     for filename_tuple in [
-                            ('amazon_reviews_us_Digital_Software_v1_00.tsv.gz',       '18MB'),
-                            ('amazon_reviews_us_Musical_Instruments_v1_00.tsv.gz',    '184MB'),
+                            ('spiked_data.tsv', '33kb'),
+                            # ('amazon_reviews_us_Digital_Software_v1_00.tsv.gz',       '18MB'),
+                            # ('amazon_reviews_us_Musical_Instruments_v1_00.tsv.gz',    '184MB'),
                             # ('amazon_reviews_us_Apparel_v1_00.tsv.gz',                '620MB'),
                             # ('amazon_reviews_us_Books_v1_02.tsv.gz',                  '1.2GB'),
                             # ('amazon_reviews_us_Wireless_v1_00.tsv.gz',               '1.6GB'),

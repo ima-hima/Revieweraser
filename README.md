@@ -12,6 +12,8 @@ to judge poor reviewers. Current criteria are:
 1. Reviewer consistently gives high reviews.
 1. Reviewer consistently writes extemely short reviews.
 
+
+
 The project pipeline is:
 
 1. Data comes out of S3 in .gz files.
@@ -40,5 +42,3 @@ For each of these source files, please see the respective `README` files in the 
 | `src/wsgi script`           | wsgi server-side code for Apache         |
 | `run.sh`                    | shell script to run source               |
 | `test`                      | profling and prototyping code            |
-
-
