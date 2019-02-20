@@ -22,6 +22,7 @@ $(document).ready(function() {
   maxOutput.innerHTML = maxSlider.value;
   wordCount.innerHTML = wordSlider.value;
 
+  // In all of following, if the checkbox is checked the value is true, so true == hide
   // Check for button selection
   $("#lowReviewCheck").on('input', function() {
     console.log($(this));
@@ -37,7 +38,7 @@ $(document).ready(function() {
   });
 
 
-  // Now update the slider values
+  // Now updated the slider values
   // First with min value
   $("#minSlider").on('input', function() {
     // Show min value in display
@@ -52,19 +53,28 @@ $(document).ready(function() {
     sendToContent('curMaxVal', highReviewCheck.is(':checked'), $(this).val());
   });
 
+
   // Finally word slider
   $("#wordSlider").on('input', function() {
     // Show min value in display
     $("#wordCount").html($(this).val());
     sendToContent('wordCount', wordCountCheck.is(':checked'), $(this).val());
   });
+
+
+  //   chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+  //   chrome.tabs.sendMessage(tabs[0].id, {greeting: "hello"}, function(response) {
+  //     console.log(response.farewell);
+  //   });
+  // });
+
 });
 
-function sendToContent(which, checkbox, sliderVal) {
-    // Send to content.js. Note that which is a jQuery selector.
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-      chrome.tabs.sendMessage(tabs[0].id, {selector: which, checkbox: checkbox, sliderVal: sliderVal}, function(response) {
-        console.log(response.farewell);
-      });
+function sendToContent(which_selector, checkbox, sliderVal) {
+  // Send to content.js. Note that which is a jQuery selector.
+  chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+    chrome.tabs.sendMessage(tabs[0].id, {which_selector: which_selector, checkbox: checkbox, sliderVal: sliderVal}, function(response) {
+      console.log(response.farewell);
     });
-  }
+  });
+}

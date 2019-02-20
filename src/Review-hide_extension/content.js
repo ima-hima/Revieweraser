@@ -43,16 +43,17 @@ $(document).ready(function() {
       //             "from a content script:" + sender.tab.url :
       //             "from the extension");
       // alert(request.selector + ' ' + request.val);
-      update(request.selector, request.checkbox, request.sliderVal);
+      update(request.which_selector, request.checkbox, request.sliderVal);
       sendResponse({farewell: "nope"});
       return true;
     }
   );
 
   function selector_update(which_selector, checkbox, sliderVal) {
+    console.log('selector_update', which_selector, checkbox, sliderVal)
     // step through relevants_arr
       // We have to check both that slider is active and that it has correct value.
-      // We can't just set to active or now, because of else clause in `update()`.
+      // We can't just set to active or not, because of else clause in `update()`.
       // If checkbox is off, it's off. If it's on we also need to check the slider value.
     $.each(relevants_arr, function(index, object) {
       if (which_selector == 'wordCountCheck') {
@@ -62,6 +63,7 @@ $(document).ready(function() {
       } else {
         object['highReviewCheck'] = (checkbox && sliderVal < object['avgStars']);
       }
+      console.log(object['wordCountCheck'], object['lowReviewCheck'], object['highReviewCheck']);
     });
   }
 
@@ -74,7 +76,10 @@ $(document).ready(function() {
     // curMinVal
     // curMaxVal
     // wordCount
+
+  /*************** In this fn, remember that a value of true means to hide something. ***************/
   function update(which_selector, checkbox, sliderVal) {
+    console.log('update', which_selector, checkbox, sliderVal)
     // if it's a checkbox
     if (which_selector == 'wordCountCheck' ||
         which_selector == 'lowReviewCheck' ||
@@ -115,19 +120,20 @@ $(document).ready(function() {
         }
       });
     }
-  }
-  $('.a-profile').each(function() {
-    var user_id = get_user_id( $(this).attr('href') );
-    if (user_id in relevants_arr) {
-      var object = relevants_arr[user_id];
-      if (object['lowReviewCheck'] || object['highReviewCheck'] || object['wordCountCheck']) {
-        $(this).parent().parent().css("display", "none");
-      } else {
-        $(this).parent().parent().css("display", "contents");
+    $('.a-profile').each(function() {
+      var user_id = get_user_id( $(this).attr('href') );
+      if (user_id in relevants_arr) {
+        var object = relevants_arr[user_id];
+        // true == hide
+        if (object['lowReviewCheck'] || object['highReviewCheck'] || object['wordCountCheck']) {
+          $(this).parent().parent().css("display", "none");
+        } else {
+          $(this).parent().parent().css("display", "contents");
+        }
+      console.log(object['wordCountCheck'], object['lowReviewCheck'], object['highReviewCheck']);
       }
-    }
-  });
-
+    });
+  }
   function get_user_id(input_url) {
     var secondidx  = input_url.search('/ref'); // second index of the substring containing the user id
     return input_url.substring(26, secondidx); // it always starts at 25
