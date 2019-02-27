@@ -6,7 +6,8 @@
     "permissions": [ "tabs",
                      "declarativeContent",
                      "storage",
-                     "https://*.storystreetconsulting.com/wsgi*"
+                     "https://*/",
+                     "https://.storystreetconsulting.com/wsgi*"
                    ],
     "background": {
       "scripts": ["jquery-3.3.1.min.js", "popup.js"],
@@ -23,7 +24,7 @@
       "persistent": false,
       "run_at": "document_end"
     }],
-    "page_action": {
+    "browser_action": {
       "default_popup": "popup.html",
       "default_icon": {
         "16": "images/get_started16.png",
