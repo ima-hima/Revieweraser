@@ -38,11 +38,6 @@ $(document).ready(function() {
 
   chrome.runtime.onMessage.addListener(
     function(request, sender, sendResponse) {
-      // console.log(request);
-      // console.log(sender.tab ?
-      //             "from a content script:" + sender.tab.url :
-      //             "from the extension");
-      // alert(request.selector + ' ' + request.val);
       update(request.which_selector, request.checkbox, request.sliderVal);
       sendResponse({farewell: "nope"});
       return true;
@@ -50,7 +45,6 @@ $(document).ready(function() {
   );
 
   function selector_update(which_selector, checkbox, sliderVal) {
-    // console.log('selector_update', which_selector, checkbox, sliderVal)
     // step through relevants_arr
       // We have to check both that slider is active and that it has correct value.
       // We can't just set to active or not, because of else clause in `update()`.
@@ -63,7 +57,6 @@ $(document).ready(function() {
       } else {
         object['highReviewCheck'] = (checkbox && sliderVal < object['avgStars']);
       }
-      // console.log(object['wordCountCheck'], object['lowReviewCheck'], object['highReviewCheck']);
     });
   }
 
@@ -79,7 +72,6 @@ $(document).ready(function() {
 
   /*************** In this fn, remember that a value of true means to hide something. ***************/
   function update(which_selector, checkbox, sliderVal) {
-    // console.log('update', which_selector, checkbox, sliderVal)
     // if it's a checkbox
     if (which_selector == 'wordCountCheck' ||
         which_selector == 'lowReviewCheck' ||
@@ -119,7 +111,8 @@ $(document).ready(function() {
           }
         }
       });
-    }
+    } // end isCheckbox conditional
+    // Now step through all profiles and show/hide relevants.
     $('.a-profile').each(function() {
       var user_id = get_user_id( $(this).attr('href') );
       if (user_id in relevants_arr) {
@@ -130,7 +123,6 @@ $(document).ready(function() {
         } else {
           $(this).parent().parent().css("display", "contents");
         }
-      // console.log(object['wordCountCheck'], object['lowReviewCheck'], object['highReviewCheck']);
       }
     });
   }
@@ -175,8 +167,6 @@ $(document).ready(function() {
       $("#results").append("error");
       console.log(errorMsg);
     }
-  });
-
-
-});
+  }); // end ajax
+}); // end document ready
 

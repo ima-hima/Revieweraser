@@ -1,7 +1,3 @@
-// Copyright 2018 The Chromium Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
 'use strict';
 
 $(document).ready(function() {
@@ -25,7 +21,6 @@ $(document).ready(function() {
   // In all of following, if the checkbox is checked the value is true, so true == hide
   // Check for button selection
   $("#lowReviewCheck").on('input', function() {
-    console.log($(this));
     sendToContent('lowReviewCheck', $(this).is(':checked'), minSlider.val());
   });
 
