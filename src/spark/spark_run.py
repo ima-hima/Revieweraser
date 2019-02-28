@@ -18,15 +18,22 @@ def main():
     sc         = SparkContext(conf=spark_conf)
 
     # Call aws result is a space delimited string file names and metadata
-    input_list = ['aws', 's3', 'ls', 's3://eric-ford-insight-19/original/']
-    file_list  = check_output(input_list)
-    file_list  = str(file_list, encoding='utf-8').split('\n')
-    for i in range(5): # Five times to make large data set
+    input_list     = ['aws', 's3', 'ls', 's3://eric-ford-insight-19/original/']
+    file_list      = check_output(input_list)
+    file_list      = str(file_list, encoding='utf-8').split('\n')
+    total_filesize = 0
+    for i in range(2): # Two times to make large data set
         for line in file_list[1:-1]: # The first item is '0' and the last one is empty
-            file = line.split()[-1]  # the file name is the last item in the space-delimited string
+            file            = line.split()[-1]  # the file name is the last item in the space-delimited string
+            filesize        = round(int(line.split()[2]) / 100000000, 2)
+            total_filesize += filesize
             print(str(i) + 'th time,', file)
+            print('File size:', filesize)
+            interim_time = time()
             process_file(file, sc)
-    print("total time:", time() - start_time)
+            print("Interim time:", time() - interim_time)
+    print("Total time:     ", time() - start_time)
+    print("Total file size:", total_filesize)
 
 def process_file(input_filename, sc):
     ''' Import a file from S3 directly to an rdd. Process that rdd and write out to Redis DB. '''
@@ -61,12 +68,12 @@ def redis_insert(iter, host, passwd, port, db):
     import redis
     redis_db = redis.StrictRedis(host=host, password=passwd, port=int(port), db=int(db))
     for tup in iter:
-        if redis_db.exists(tup[0]):
+        # if redis_db.exists(tup[0]):
             redis_db.hincrby(tup[0], 'num',   tup[1])
             redis_db.hincrby(tup[0], 'stars', tup[2])
             redis_db.hincrby(tup[0], 'words', tup[3])
-        else:
-            redis_db.hmset(tup[0], {'num': tup[1], 'stars': tup[2], 'words': tup[3]} )
+        # else:
+        #     redis_db.hmset(tup[0], {'num': tup[1], 'stars': tup[2], 'words': tup[3]} )
 
 
 def create_map_keys_idx_fn(line):
