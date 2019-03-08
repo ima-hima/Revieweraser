@@ -11,8 +11,7 @@ from time       import time
 
 
 def main():
-    ''' Loop over input files from S3. '''
-    start_time = time()
+    ''' Loop over input files from S3. This should def. be parallelized. '''
     # first set up spark context
     spark_conf = SparkConf().setAppName("Revieweraser")
     sc         = SparkContext(conf=spark_conf)
@@ -27,16 +26,12 @@ def main():
             file            = line.split()[-1]  # the file name is the last item in the space-delimited string
             filesize        = round(int(line.split()[2]) / 100000000, 2)
             total_filesize += filesize
-            print(str(i) + 'th time,', file)
-            print('File size:', filesize)
             interim_time = time()
             process_file(file, sc)
-            print("Interim time:", time() - interim_time)
-    print("Total time:     ", time() - start_time)
-    print("Total file size:", total_filesize)
 
 def process_file(input_filename, sc):
     ''' Import a file from S3 directly to an rdd. Process that rdd and write out to Redis DB. '''
+
     # I moved the password, etc. into another file that won't go on github.
     host, passwd, port, db = open('redis-pass.txt').readline().split()
     originalRDD = sc.textFile('s3a://eric-ford-insight-19/original/' + input_filename) # Don't forget it's s3a, not s3.
@@ -49,7 +44,7 @@ def process_file(input_filename, sc):
 
     # Determine how many reviews each reviewer has written.
     keyed_for_counts = originalRDD.filter(lambda line: line != header).map(map_counts_rdd_fn)
-    keyed_for_counts = keyed_for_counts.repartition(5)    # repartitioning here speeds things up significantly
+    keyed_for_counts = keyed_for_counts.repartition(10)    # repartitioning here speeds things up significantly
     counts           = keyed_for_counts.reduceByKey(count_keys)
 
     # Count total stars and total word count for each user, to be used eventually for sum_review_values.
@@ -64,20 +59,20 @@ def process_file(input_filename, sc):
 
 def redis_insert(iter, host, passwd, port, db):
     ''' Insert tuple (rdd) into Redis. Tuple is of form (key, [int, int, int]), where the ints are
-        number of reviews, total star rating, total number of words, respectively. '''
+        number of reviews, total star rating, total number of words, respectively.
+        Turn on pipelining. '''
     import redis
-    redis_db = redis.StrictRedis(host=host, password=passwd, port=int(port), db=int(db))
+    db = redis.StrictRedis(host=host, password=passwd, port=int(port), db=int(db))
+    d = db.pipeline()
     for tup in iter:
-        # if redis_db.exists(tup[0]):
-            redis_db.hincrby(tup[0], 'num',   tup[1])
-            redis_db.hincrby(tup[0], 'stars', tup[2])
-            redis_db.hincrby(tup[0], 'words', tup[3])
-        # else:
-        #     redis_db.hmset(tup[0], {'num': tup[1], 'stars': tup[2], 'words': tup[3]} )
+        d.hincrby(tup[0], 'num',   tup[1])
+        d.hincrby(tup[0], 'stars', tup[2])
+        d.hincrby(tup[0], 'words', tup[3])
 
 
 def create_map_keys_idx_fn(line):
-    ''' Same as create_map_keys_fn, but using indices rather than keys. '''
+    ''' Return a tuple with key : val = user_id : [star rating, number of words].
+        Using indices rather than keys. '''
     line = line.split('\t')
     return (line[1], [int(line[7]), line[13].count(' ') + 1])
 
@@ -101,13 +96,6 @@ def count_keys(accum, input_value):
     ''' Increment each time it's called. This will be used to get a total for how many times each
         key appears. '''
     return accum + 1
-
-
-def create_map_keys_fn(line):
-    ''' Return a tuple with key : val = user_id : [star rating, number of words]. '''
-    line = line.split('\t')
-    return (line[1], [int(line[7]), line[13].count(' ') + 1])
-
 
 
 

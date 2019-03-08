@@ -21,13 +21,13 @@ import redis
 
 
 
-def without_databricks(input_tuple, sc, numPartitions, interim_profiling):
+def without_databricks(input_tuple, sc, interim_profiling):
     ''' Import a file from S3 directly to an rdd. Process that rdd and write out to Redis DB. '''
     overall_start_time = time()
 
     print('\n\n**default**')
     print('\nFile size:', input_tuple[1])
-    print('Number of partitions', numPartitions)
+    print('Number of partitions', 1)
 
     host, passwd, port, db = open('redis-pass.txt').readline().split()
     # print(host)
@@ -39,22 +39,22 @@ def without_databricks(input_tuple, sc, numPartitions, interim_profiling):
 
     # Here and below, call to first() is to force evaluation for profiling output. Is that slowing
     # things down? Maybe, so put in conditional.
-    if interim_profiling:
-        cur_start_time = time()
+    # if interim_profiling:
+    #     cur_start_time = time()
 
     # create initial key:val. After this rows will be (user_id, [star rating, number of words])
     keyed_data = originalRDD.filter(lambda line: line != header).map(create_map_keys_idx_fn)
     # keyed_data = keyed_data.repartition(5)
 
-    if interim_profiling:
-        r = keyed_data.first() # this to force lazy eval for timing
-        print_updates('create original map:', cur_start_time, keyed_data.getNumPartitions())
+    # if interim_profiling:
+    #     r = keyed_data.first() # this to force lazy eval for timing
+    #     print_updates('create original map:', cur_start_time, keyed_data.getNumPartitions())
 
     # Determine how many reviews each reviewer has written.
     if interim_profiling:
         cur_start_time = time()
     keyed_for_counts = originalRDD.filter(lambda line: line != header).map(map_counts_rdd_fn)
-    # keyed_for_counts = keyed_for_counts.repartition(numPartitions)    # repartitioning here speeds things up significantly
+    # Not partitioning here.
     counts           = keyed_for_counts.reduceByKey(count_keys)
     if interim_profiling:
         r = counts.first() # this to force lazy eval for timing
@@ -75,7 +75,7 @@ def without_databricks(input_tuple, sc, numPartitions, interim_profiling):
     final = counts.join(per_review_totals).map(concat_fn)
     if interim_profiling:
         r = final.first() # this to force lazy eval for timing
-        print_updates('join:', cur_start_time, counts.getNumPartitions())
+        print_updates('join:', cur_start_time, final.getNumPartitions())
 
     cur_start_time = time()
     final.foreachPartition( lambda x: redis_insert(x, host, passwd, port, db) )
@@ -98,12 +98,13 @@ def without_databricks(input_tuple, sc, numPartitions, interim_profiling):
 
 
 def without_all(input_tuple, sc, numPartitions, interim_profiling):
-    ''' Import a file from S3 directly to an rdd. Process that rdd and write out to Redis DB. '''
+    ''' Import a file from S3 directly to an rdd. Process that rdd and write out to Redis DB.
+        Using partitioning and inserting into Redis using pipelining. '''
     overall_start_time = time()
 
     print('\n\n**without all**')
     print('\nFile size:', input_tuple[1])
-    print('Number of partitions', numPartitions)
+    # print('Number of partitions', numPartitions)
 
     host, passwd, port, db = open('redis-pass.txt').readline().split()
     # print(host)
@@ -241,21 +242,17 @@ def redis_insert(iter, host, passwd, port, db):
     ''' Insert tuple (rdd) into Redis. Tuple is of form (key, [int, int, int]), where the ints are
         number of reviews, total star rating, total number of words, respectively. '''
     import redis
-    # redis_db = redis.Redis(host="10.0.0.13", port=6379, db=1)
     db = redis.StrictRedis(host=host, password=passwd, port=int(port), db=int(db))
-    # d = db.pipeline()
     for tup in iter:
-        if db.exists(tup[0]):
-            db.hincrby(tup[0], 'num',   tup[1])
-            db.hincrby(tup[0], 'stars', tup[2])
-            db.hincrby(tup[0], 'words', tup[3])
-        else:
-            db.hminsert(tup[0], {'num': tup[1], 'starts': tup[2], 'words': tup[3]})
+        db.hincrby(tup[0], 'num',   tup[1])
+        db.hincrby(tup[0], 'stars', tup[2])
+        db.hincrby(tup[0], 'words', tup[3])
 
 
 def redis_insert_pipelining(iter, host, passwd, port, db):
     ''' Insert tuple (rdd) into Redis. Tuple is of form (key, [int, int, int]), where the ints are
-        number of reviews, total star rating, total number of words, respectively. '''
+        number of reviews, total star rating, total number of words, respectively.
+        Turn on pipelining. '''
     import redis
     # redis_db = redis.Redis(host="10.0.0.13", port=6379, db=1)
     db = redis.StrictRedis(host=host, password=passwd, port=int(port), db=int(db))
@@ -268,7 +265,8 @@ def redis_insert_pipelining(iter, host, passwd, port, db):
 
 def redis_insert_without_join(iter, host, passwd, port, db):
     ''' Insert tuple (rdd) into Redis. Tuple is of form (key, [int, int, int]), where the ints are
-        number of reviews, total star rating, total number of words, respectively. '''
+        number of reviews, total star rating, total number of words, respectively.
+        In this case no join was done by Spark, so we're doing all the counting in Redis. '''
     import redis
     db = redis.StrictRedis(host=host, password=passwd, port=int(port), db=int(db))
     d = db.pipeline()
@@ -348,8 +346,8 @@ def main():
                             # ('amazon_reviews_us_Digital_Ebook_Purchase_v1_00.tsv.gz', '2.5GB'),
                           ]:
         for numPartitions in [10]: #[1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]:
-            without_databricks(filename_tuple, sc, numPartitions, True)
-            without_all(filename_tuple, sc, numPartitions, True)
+            without_databricks(filename_tuple, sc, True)
+            # without_all(filename_tuple, sc, 10, True)
             # without_join(filename_tuple, sc, numPartitions, True)
 
 if(__name__ == "__main__"):
