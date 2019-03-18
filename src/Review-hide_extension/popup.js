@@ -3,7 +3,6 @@
 $(document).ready(function() {
   // First, functionality to hide sliders
   // document.getElementById("averageReview").addEventListener("input", hideSliders); // This kludge because I couldn't get oninput to work.
-  // var slideContainer = document.getElementById("slidecontainer");
   var minSlider       = $("#minSlider");
   var minOutput       = $("#curMinVal");
   var maxSlider       = $("#maxSlider");
@@ -18,7 +17,8 @@ $(document).ready(function() {
   maxOutput.innerHTML = maxSlider.value;
   wordCount.innerHTML = wordSlider.value;
 
-  // In all of following, if the checkbox is checked the value is true, so true == hide
+  // ***IMPORTANT***
+  // In all of following, if the checkbox is checked, the value is true, so true == hide
   // Check for button selection
   $("#lowReviewCheck").on('input', function() {
     sendToContent('lowReviewCheck', $(this).is(':checked'), minSlider.val());
@@ -43,7 +43,7 @@ $(document).ready(function() {
 
   // Same thing, now with max value
   $("#maxSlider").on('input', function() {
-    // Show min value in display
+    // Show max value in display
     $("#curMaxVal").html($(this).val());
     sendToContent('curMaxVal', highReviewCheck.is(':checked'), $(this).val());
   });
@@ -56,19 +56,16 @@ $(document).ready(function() {
     sendToContent('wordCount', wordCountCheck.is(':checked'), $(this).val());
   });
 
-
-  //   chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-  //   chrome.tabs.sendMessage(tabs[0].id, {greeting: "hello"}, function(response) {
-  //     console.log(response.farewell);
-  //   });
-  // });
-
 });
 
+// Send to content.js. Note that `which_selector` is a jQuery selector name.
+// `checkbox`: Boolean describing whether the relevant check box is checked.
+// `sliderVal`: Float of val that relevant slider is set to.
 function sendToContent(which_selector, checkbox, sliderVal) {
-  // Send to content.js. Note that which is a jQuery selector.
   chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-    chrome.tabs.sendMessage(tabs[0].id, {which_selector: which_selector, checkbox: checkbox, sliderVal: sliderVal}, function(response) {
+    chrome.tabs.sendMessage( tabs[0].id,
+                             { which_selector: which_selector, checkbox: checkbox, sliderVal: sliderVal },
+                             function(response) {
       console.log(response.farewell);
     });
   });

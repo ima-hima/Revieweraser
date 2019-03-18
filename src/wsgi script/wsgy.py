@@ -3,7 +3,6 @@ import sys
 import os
 import urllib
 
-# import urllib.parse
 from json import loads, dumps
 
 def application(environ, start_response):
@@ -11,7 +10,7 @@ def application(environ, start_response):
         Return results as JSON. '''
 
     # Make sure there's something in there.
-    query_body = urllib.parse.parse_qs(environ['QUERY_STRING']) #environ['QUERY_STRING'])
+    query_body = urllib.parse.parse_qs(environ['QUERY_STRING'])
 
     # check to make sure an actual query came through
     if not query_body:
@@ -39,7 +38,7 @@ def application(environ, start_response):
             return_values[this_id] = interim_dict
 
 
-    # # # Now, back to JSON
+    # Now, back to JSON
     json_output = dumps(return_values)
 
     status = '200 OK'

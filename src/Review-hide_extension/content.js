@@ -10,14 +10,13 @@
 
 
 // on update:
-//    we're turning on criterium_a:
+//    if we’re turning on criterium_a:
 //        log which criterium to be updated
 //        for each of relevants_arr:
-//            for each of relevants_arr
 //            if match criterium_a:
 //                hide user
 //            update user[criterium_a] to true
-//    else we're turning off criterium_a:
+//    else we’re turning off criterium_a:
 //        for each of relevants_arr:
 //            if user[criterium_a] is true and others are false:
 //                show user
@@ -27,28 +26,32 @@
 $(document).ready(function() {
 
   var relevants_arr = {}; // This will be list of users who have > 10 reviews, i.e. relevant users.
+  var get_string;         // This will hold the url *including* a GET value. Need it to send data to ajax url,
+                          // because .ajax() can't evaluate a fn as argument
 
-
-  // for each input for listener:
-       // I'm just going to assume that people with high average reviews aren't
-       // the same as those with low ones, and do just two conditionals. I.e. I'm not
-       // going to unhide/hide depending on multiple criteria, just update depending on
-       // The most recent input.
-  //   if clicked off then step through and turn back on
 
   chrome.runtime.onMessage.addListener(
     function(request, sender, sendResponse) {
+      // Get values from `popup.js.sendToContent()`. Send values to `update()`
       update(request.which_selector, request.checkbox, request.sliderVal);
-      sendResponse({farewell: "nope"});
+      sendResponse({farewell: "nope"}); // This never seems to be received. Out of debugging time to fix it.
       return true;
     }
   );
 
-  function selector_update(which_selector, checkbox, sliderVal) {
+  // Helper fn for `update()`. Gets called only if a checkbox value has been changed by the user.
+  // Thus only updates checkbox selector values.
+  //
+  // Inputs are
+     // `which_selector`: Str: "wordCountCheck", "rowReviewCheck", "highReviewCheck";
+     // `checkbox`: Bool: whether the checkbox for relevant of above items is has been checked on;
+     // `sliderVal`: Float: the current value.
+  function checkbox_update(which_selector, checkbox, sliderVal) {
     // step through relevants_arr
       // We have to check both that slider is active and that it has correct value.
-      // We can't just set to active or not, because of else clause in `update()`.
-      // If checkbox is off, it's off. If it's on we also need to check the slider value.
+      // We can’t just set to active or not, because of else clause in `update()`.
+      // If checkbox is off, it’s off. If it’s on we also need to check the slider value.
+      // Note that `object` is object at that position in relevants_arr.
     $.each(relevants_arr, function(index, object) {
       if (which_selector == 'wordCountCheck') {
         object['wordCountCheck'] = (checkbox && sliderVal > object['avgWords']);
@@ -60,7 +63,8 @@ $(document).ready(function() {
     });
   }
 
-  // For each of the relevants_arr, if the criterium of the which selector matches, hide it.
+
+  // For each of relevants_arr, if the criterium of the which selector matches, hide it.
   // Remember that I need to check for true/false values for all three selector values.
   // which_selector possibilities:
     // lowReviewCheck
@@ -70,18 +74,29 @@ $(document).ready(function() {
     // curMaxVal
     // wordCount
 
-  /*************** In this fn, remember that a value of true means to hide something. ***************/
+  // for each input for listener:
+       // I'm just going to assume that people with high average reviews aren’t
+       // the same as those with low ones, and do only two conditionals. I.e. I’m not
+       // going to unhide/hide depending on multiple criteria, just update depending on
+       // The most recent input.
+  // if clicked off then step through and turn back on
+  // **NOTE**: This is confusing and should be changed: checkbox value in relevants_arr is used only
+  // to do DOM changes in Amazon, *not* to update checkbox in popup.html, which can only ever
+  // be changed by the user.
   function update(which_selector, checkbox, sliderVal) {
-    // if it's a checkbox
+  /*************** In this fn, remember that a value of true means to hide something. ***************/
+
+    // if it’s a checkbox that’s changed
     if (which_selector == 'wordCountCheck' ||
         which_selector == 'lowReviewCheck' ||
         which_selector == 'highReviewCheck'
        ) {
-      selector_update(which_selector, checkbox, sliderVal);
-    } else {
-      // At this point the checkbox is either on or off. If the checkbox is what changed ignore all this.
+      checkbox_update(which_selector, checkbox, sliderVal);
+    } else { // It was a slider that was changed. I.e., if the checkbox is what changed ignore all of this.
+      // At this point the checkbox is either on or off.
+      // Otherwise,
       // step through relevants_arr
-          // if relevant value matches and the checkbox is checked
+          // if relevant value matches and the checkbox has been checked
             // set checkbox to true
           // else (no longer a match)
             // set checkbox to false
@@ -112,6 +127,7 @@ $(document).ready(function() {
         }
       });
     } // end isCheckbox conditional
+
     // Now step through all profiles and show/hide relevants.
     $('.a-profile').each(function() {
       var user_id = get_user_id( $(this).attr('href') );
@@ -126,13 +142,16 @@ $(document).ready(function() {
       }
     });
   }
+
+
+  // Return the id of the user from the url string.
   function get_user_id(input_url) {
     var secondidx  = input_url.search('/ref'); // second index of the substring containing the user id
     return input_url.substring(26, secondidx); // it always starts at 25
   }
 
 
-  // Create a url with GET query string for pinging web server
+  // Create a url with GET query string for pinging web server.
   function get_url() {
     var query_string = '?';
     var idx = 0;
@@ -143,12 +162,12 @@ $(document).ready(function() {
     return ('https://storystreetconsulting.com/wsgi' + query_string);
   }
 
-  var get_string = get_url(); // Need this to send data to ajax url, because it won't evaluate a fn.
+  get_string = get_url(); // Have to initializie it here because it can’t be set until `get_url()` is defined.
 
   // send url to server, get response, save it into array of relevant users
   $.ajax({
     dataType: 'json',
-    url: get_string,
+    url:      get_string,
     success: function(return_data) {
       $.each(return_data, function(index, value) {
         if (value['num'] >= 10) {  // relevant users have at least 10 reviews
