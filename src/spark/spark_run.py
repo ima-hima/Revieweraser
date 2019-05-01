@@ -1,6 +1,10 @@
 ''' Run Spark.
-    This is expecting a .tsv file in the next directory up.
-    Current criteria for removal: two or more reviews that are 5 stars and have five or fewer words. '''
+    Read Amazon review files from S3 bucket. For each file:
+    1. Import as rdd
+    2. Process per line creating a map from user_id to a tuple of star rating, word count
+    3. Reduce by key to count number of times a user_id appears
+    4. Join count and originalm map on user_id
+    Finally write out to Redis. '''
 
 # import com.datastax.spark.connector._
 
@@ -78,12 +82,12 @@ def create_map_keys_idx_fn(line):
 
 
 def map_counts_rdd_fn(line):
-    ''' Same as map_counts_fn, but using indices rather than keys. '''
+    ''' Return (user_id, 1) to be used to accumulate number of times user_id appears. '''
     line = line.split('\t') # there's got to be a faster way
     return (line[1], 1)
 
 def concat_fn(line):
-    ''' Receive a tuple of form (key, [,(,)]) a Return a tuple (,,,) . '''
+    ''' Receive a tuple of form (key, [a,(b,c)]) a Return a tuple (key,a,b,c) . '''
     return (line[0], line[1][0], line[1][1][0], line[1][1][1])
 
 
