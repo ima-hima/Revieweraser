@@ -10,16 +10,16 @@
                      "https://.storystreetconsulting.com/wsgi*"
                    ],
     "background": {
-      "scripts": ["jquery-3.3.1.min.js", "popup.js"],
+      "scripts": ["jquery-3.7.1.slim.min.js", "popup.js"],
       "persistent": false
     },
     "background": [{
-      "scripts": ["jquery-3.3.1.min.js", "background.js"],
+      "scripts": ["jquery-3.7.1.slim.min.js", "background.js"],
       "persistent": false,
       "run_at": "document_end"
     }],
     "content_scripts": [{
-      "js": ["jquery-3.3.1.min.js", "content.js"],
+      "js": ["jquery-3.7.1.slim.min.js", "content.js"],
       "matches": ["https://www.amazon.com/*"],
       "persistent": false,
       "run_at": "document_end"
